@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+.kotlin/
+build/
+
+# The dev game: worlds, logs, configs and the mods used for testing
+run/
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db

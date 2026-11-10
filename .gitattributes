@@ -1,0 +1,5 @@
+# Text files use LF in the repository and in checkouts, so the Gradle wrapper script runs everywhere.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary

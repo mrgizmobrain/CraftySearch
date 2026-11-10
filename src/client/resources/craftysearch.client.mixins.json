@@ -1,0 +1,25 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.craftysearch.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "AbstractContainerScreenAccessor",
+    "AbstractContainerScreenMixin",
+    "AbstractRecipeBookScreenInvoker",
+    "AbstractRecipeBookScreenMixin",
+    "ClientPacketListenerMixin",
+    "CraftingRecipeBookComponentMixin",
+    "IpnActionsMixin",
+    "IpnSlotHighlightMixin",
+    "LocalPlayerMixin",
+    "MultiPlayerGameModeMixin",
+    "RecipeBookComponentInvoker",
+    "RecipeBookComponentMixin",
+    "RecipeButtonMixin",
+    "RecipeCollectionAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
