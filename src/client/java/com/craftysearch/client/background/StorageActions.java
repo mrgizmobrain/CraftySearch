@@ -241,7 +241,7 @@ public final class StorageActions {
      * Right-click with "Open" (Nov 9): opens the nearest container holding the tile, one someone
      * else has used first, then one with it loose before one with it in a shulker box. In server mode the server opens it from anywhere
      * within the radius (if it allows that); otherwise it's a plain right-click on one within
-     * reach. Its slots are marked once it's open, and the other containers stay outlined. Closing
+     * reach. Its slots are marked once it's open; nothing is outlined. Closing
      * it goes back to the world, as closing any container does.
      */
     public static void open(Minecraft mc, ItemTotal total) {
@@ -275,7 +275,9 @@ public final class StorageActions {
             player.sendOverlayMessage(Component.translatable("craftysearch.storage.out_of_reach", total.display().getHoverName()));
             return;
         }
-        Highlights.show(mc, total.sources(), tile);
+        // No outlines (Nov 11: the other containers were outlined, which read as a mistake); "Show where"
+        // is for that. The search is still set, so the item's slots are marked in the screen that opens.
+        Highlights.show(mc, List.of(), tile);
         // The screen that opens is this container's, so it's recorded (and marked) as such.
         ContainerRecorder.expectOpening(target.key());
         if (remote) {
