@@ -40,8 +40,8 @@ final class PanelMouse {
     }
 
     /**
-     * A press: a shift-press on a tile, or with the panel showing on an inventory stack with
-     * the put-away button, starts a drag. The press itself is done the usual way: the grid
+     * A press: a shift-press on a tile, or with the panel showing on or beside the inventory
+     * slots with the put-away button, starts a drag. The press itself is done the usual way: the grid
      * takes, the screen's quick-move puts away. Mouse Tweaks may drag over the same slots
      * (with the left button only); its quick-moves and this drag share {@link #DONE}, so
      * each stack is stored once whoever gets there first.
@@ -61,8 +61,19 @@ final class PanelMouse {
             return;
         }
         if (screen == null || event.button() != config.putAway.shiftClick.button()) return;
-        // The pressed stack is stored by the screen's quick-move right after this, which records it.
-        if (inventoryStackAt(screen, event.x(), event.y()) >= 0) drag = Drag.INVENTORY;
+        if (!BackgroundJobs.heldItem(screen.getMenu()).isEmpty()) return;
+        // A pressed stack is stored by the screen's quick-move right after this, which records it.
+        // The drag may also start on an empty slot or beside the slots and store what it passes over
+        // (Nov 10: it only started on a stack). Not on a button or the recipe book, and not on a
+        // filled slot outside the inventory, such as the crafting result, whose shift-click is its own.
+        Slot slot = ((AbstractContainerScreenAccessor) screen).craftysearch$slotAt(event.x(), event.y());
+        boolean onWidget = slot == null && screen.getChildAt(event.x(), event.y()).isPresent();
+        boolean otherStack = slot != null && slot.hasItem() && !isMainInventory(slot);
+        if (!onWidget && !otherStack) drag = Drag.INVENTORY;
+    }
+
+    private static boolean isMainInventory(Slot slot) {
+        return slot.container instanceof Inventory && slot.getContainerSlot() < Inventory.INVENTORY_SIZE;
     }
 
     /** True while a drag over inventory stacks is putting them away. */

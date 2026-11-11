@@ -360,6 +360,8 @@ The user confirmed all of that worked, then (Nov 9):
 
 **Ready for GitHub (Nov 9).** A cleanup pass meant to change no behaviour: the four settings pages share one base (`gui/SettingsScreen`: two columns filled in reading order, a setting's label and tooltip found by its key), imports sorted, vanilla's `Inventory.INVENTORY_SIZE` and `SELECTION_SIZE` in place of the mod's own copies. A check for unused imports, members never referenced and unused language strings found none. Added: an MIT `LICENSE` (also packed into the jar), `README.md`, the author, links and license in `fabric.mod.json`, `.gitignore` (the dev game's `run/` folder and IDE files) and `.gitattributes`, and a git repository. The user chose MIT, the author name mrgizmobrain and `github.com/mrgizmobrain/CraftySearch`.
 
+**Put-away drag from an empty spot (Nov 10).** A shift-drag over inventory stacks only became a put-away drag when the press landed on a stack. Started on an empty slot or beside the slots, nothing marked the drag as storing, so Mouse Tweaks' own shift-drag (which clicks straight through the game, past the screen) moved the stacks within the inventory instead. The drag now starts from any press with Shift and the put-away button while the panel shows and the cursor is empty, except on a button or the recipe book, or on a filled slot outside the main inventory (the crafting result's shift-click is its own).
+
 ## 9. Open questions / later
 - Before a release: an icon, a dedicated-server test, and the Modrinth and CurseForge listings.
 - Ender chests: decided against (Nov 8). The user prefers them without the mod; each player's ender chest is one inventory behind every ender chest block, so it would need its own handling in every part.
