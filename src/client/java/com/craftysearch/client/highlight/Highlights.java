@@ -33,6 +33,8 @@ import java.util.ListIterator;
  */
 public final class Highlights {
     private static final int COLOR = 0xFF4CFF4C;
+    /** A container someone else has used since it was read (client-only mode): its count may be off. */
+    public static final int SUSPECT_COLOR = 0xFFFFA000;
     private static final int COUNT_COLOR = 0xFFFFFFFF;
     private static final float LINE_WIDTH = 2.5f;
     /**
@@ -51,7 +53,7 @@ public final class Highlights {
     }
 
     /** What an outline's label says and where the outline's middle is, for {@link HighlightMarkers}. */
-    public record Marker(Vec3 center, String count, int stackSize) {
+    public record Marker(Vec3 center, String count, int stackSize, int color) {
     }
 
     private static List<Marked> marked = List.of();
@@ -142,16 +144,18 @@ public final class Highlights {
                     addToStack(stacks, box, m.count());
                 } else {
                     String count = StorageIndex.formatCount(m.count());
-                    outline(box);
+                    // Orange for one someone else has used (Nov 11): the one to go and look in.
+                    int color = m.entry().suspect() ? SUSPECT_COLOR : COLOR;
+                    outline(box, color);
                     if (labels) label(box.getCenter(), count, null);
-                    nowMarked.add(new Marker(box.getCenter(), count, 1));
+                    nowMarked.add(new Marker(box.getCenter(), count, 1, color));
                 }
             }
             for (Stack stack : stacks) {
                 String count = StorageIndex.formatCount(stack.count);
-                outline(stack.bounds);
+                outline(stack.bounds, COLOR);
                 if (labels) label(stack.bounds.getCenter(), count, stack.boxes.size() > 1 ? "×" + stack.boxes.size() : null);
-                nowMarked.add(new Marker(stack.bounds.getCenter(), count, stack.boxes.size()));
+                nowMarked.add(new Marker(stack.bounds.getCenter(), count, stack.boxes.size(), COLOR));
             }
         }
         markers = nowMarked;
@@ -203,8 +207,8 @@ public final class Highlights {
         else joined.add(box, count);
     }
 
-    private static void outline(AABB box) {
-        Gizmos.cuboid(box.inflate(0.005), GizmoStyle.stroke(COLOR, LINE_WIDTH)).setAlwaysOnTop();
+    private static void outline(AABB box, int color) {
+        Gizmos.cuboid(box.inflate(0.005), GizmoStyle.stroke(color, LINE_WIDTH)).setAlwaysOnTop();
     }
 
     /**

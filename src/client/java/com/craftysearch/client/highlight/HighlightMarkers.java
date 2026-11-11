@@ -25,8 +25,6 @@ import java.util.List;
  */
 public final class HighlightMarkers {
     private static final Identifier ID = Identifier.fromNamespaceAndPath(CraftySearch.MOD_ID, "highlight_markers");
-    /** The outline's green. */
-    private static final int COLOR = 0xFF4CFF4C;
     private static final int BORDER_COLOR = 0xFF000000;
     private static final int TEXT_COLOR = 0xFFFFFFFF;
     /** Points this close to the camera plane or behind it aren't on screen. */
@@ -78,10 +76,10 @@ public final class HighlightMarkers {
         }
     }
 
-    /** A small green square with a black edge, and the count under it ("×N" for a stack of carts). */
+    /** A small square in the outline's colour with a black edge, and the count under it ("×N" for a stack of carts). */
     private static void draw(GuiGraphicsExtractor g, Font font, int x, int y, Highlights.Marker marker) {
         g.fill(x - 3, y - 3, x + 4, y + 4, BORDER_COLOR);
-        g.fill(x - 2, y - 2, x + 3, y + 3, COLOR);
+        g.fill(x - 2, y - 2, x + 3, y + 3, marker.color());
         String text = marker.stackSize() > 1 ? marker.count() + " ×" + marker.stackSize() : marker.count();
         g.centeredText(font, text, x, y + 6, TEXT_COLOR);
     }

@@ -23,7 +23,7 @@ It works with only the client installed, on any server. With the mod on the serv
 
 In server mode the mod follows claims (Open Parties and Claims, Flan, and mods using the Common Protection API), spawn protection and container locks, so nobody reaches storage they couldn't open by hand. Players without the mod can still join a server that has it.
 
-In client-only mode the panel only knows what it saw when you last opened a container, so on a shared server it can be out of date. When it sees someone else open a chest, barrel or shulker box, it marks that item's tile with an orange corner until the container is read again.
+In client-only mode the panel only knows what it saw when you last opened a container, so on a shared server it can be out of date. When it sees someone else open a chest, barrel or shulker box, it marks that item's tile with an orange corner until the container is read again. "Show where" outlines that container in orange, and "Open" goes to it first.
 
 In client-only mode the server sees ordinary container clicks, made for you in the background. Check a server's rules before using it there. The "Client-only mode" settings page has a paced Normal speed, and a Fast speed for servers without anti-cheat.
 

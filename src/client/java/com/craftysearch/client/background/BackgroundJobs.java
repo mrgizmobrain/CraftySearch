@@ -490,7 +490,7 @@ public final class BackgroundJobs {
         int closing = r.table != null && !r.tableClosed ? mc.player.containerMenu.containerId : -1;
         if (!BackgroundAccess.open(mc, entry, TIMEOUT_MILLIS, closing)) return;
         r.current = entry;
-        ContainerWatch.ours(entry);
+        ContainerWatch.opened(entry);
         if (r.table != null) r.tableClosed = true;
         r.step = Step.WAIT_OPEN;
         r.waitUntil = now + TIMEOUT_MILLIS;
@@ -515,7 +515,7 @@ public final class BackgroundJobs {
             // screen the player opened meanwhile closes whatever menu is open, so a menu left
             // open for another step could be closed under the job.
             BackgroundAccess.closeHidden(mc);
-            ContainerWatch.ours(r.current);
+            ContainerWatch.closed(r.current);
             r.current = null;
             r.step = Step.OPEN;
             paced(r, now);
@@ -543,7 +543,7 @@ public final class BackgroundJobs {
         AbstractContainerMenu menu = BackgroundAccess.hiddenMenu(mc);
         if (menu != null && r.current != null) ContainerRecorder.recordHidden(mc, r.current, menu);
         BackgroundAccess.closeHidden(mc);
-        if (r.current != null) ContainerWatch.ours(r.current);
+        if (r.current != null) ContainerWatch.closed(r.current);
         r.current = null;
         r.step = Step.OPEN;
         paced(r, now);
@@ -593,7 +593,7 @@ public final class BackgroundJobs {
      */
     private static void stop(Minecraft mc, Running r, @Nullable String message) {
         BackgroundAccess.abandon(mc);
-        if (r.current != null) ContainerWatch.ours(r.current);
+        if (r.current != null) ContainerWatch.closed(r.current);
         running = null;
         QUEUE.clear();
         // The server closed the table for the first container; its screen is dead, so open the table again.

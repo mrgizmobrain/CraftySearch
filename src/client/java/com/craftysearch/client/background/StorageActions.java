@@ -238,8 +238,8 @@ public final class StorageActions {
     }
 
     /**
-     * Right-click with "Open" (Nov 9): opens the nearest container holding the tile, one with it
-     * loose before one with it in a shulker box. In server mode the server opens it from anywhere
+     * Right-click with "Open" (Nov 9): opens the nearest container holding the tile, one someone
+     * else has used first, then one with it loose before one with it in a shulker box. In server mode the server opens it from anywhere
      * within the radius (if it allows that); otherwise it's a plain right-click on one within
      * reach. Its slots are marked once it's open, and the other containers stay outlined. Closing
      * it goes back to the world, as closing any container does.
@@ -259,10 +259,13 @@ public final class StorageActions {
             player.sendOverlayMessage(Component.translatable("craftysearch.background.wait_for_storage"));
             return;
         }
-        List<MemoryEntry> loose = total.sources().stream()
+        List<MemoryEntry> inReach = remote ? total.sources()
+                : total.sources().stream().filter(e -> RecipeStorage.isReachable(player, e)).toList();
+        // One someone else has used comes first (Nov 11): opening it reads it again, which is what the tile's mark asks for.
+        List<MemoryEntry> used = inReach.stream().filter(MemoryEntry::suspect).toList();
+        List<MemoryEntry> loose = inReach.stream()
                 .filter(e -> e.counts().keySet().stream().anyMatch(key -> tile.matchesTile(key.stack()))).toList();
-        List<MemoryEntry> candidates = loose.isEmpty() ? total.sources() : loose;
-        if (!remote) candidates = candidates.stream().filter(e -> RecipeStorage.isReachable(player, e)).toList();
+        List<MemoryEntry> candidates = !used.isEmpty() ? used : !loose.isEmpty() ? loose : inReach;
         BlockPos at = player.blockPosition();
         MemoryEntry target = candidates.stream()
                 .min(Comparator.comparingDouble(e -> e.distanceSqr(mc.level, at))).orElse(null);

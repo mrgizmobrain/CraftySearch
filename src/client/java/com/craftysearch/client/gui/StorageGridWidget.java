@@ -4,6 +4,7 @@ import com.craftysearch.client.background.BackgroundJobs;
 import com.craftysearch.client.background.InteractionHold;
 import com.craftysearch.client.background.StorageActions;
 import com.craftysearch.client.config.ClientConfig;
+import com.craftysearch.client.highlight.Highlights;
 import com.craftysearch.client.live.ServerMode;
 import com.craftysearch.client.storage.SearchFilter;
 import com.craftysearch.client.storage.StorageIndex;
@@ -57,8 +58,8 @@ final class StorageGridWidget extends AbstractWidget {
     /** Slot-coloured veil over a tile that has run out. */
     private static final int EMPTY_TILE_COLOR = 0xB08B8B8B;
     private static final int LABEL_COLOR = 0xFF404040;
-    /** The corner mark on a tile whose count may be off. */
-    private static final int SUSPECT_COLOR = 0xFFFFA000;
+    /** The corner mark on a tile whose count may be off, in the colour its container is outlined with. */
+    private static final int SUSPECT_COLOR = Highlights.SUSPECT_COLOR;
 
     private final Font font;
     private final Supplier<String> query;

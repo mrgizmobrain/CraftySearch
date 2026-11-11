@@ -123,7 +123,7 @@ public final class ContainerRecorder {
             tracked = startTracking(mc, screen);
             if (tracked == null) return;
             TRACKED.put(screen, tracked);
-            if (!tracked.key().isEntity()) ContainerWatch.ours(tracked.pos(), tracked.other());
+            if (!tracked.key().isEntity()) ContainerWatch.opened(tracked.pos(), tracked.other(), true);
         }
         AbstractContainerMenu menu = ((AbstractContainerScreen<?>) screen).getMenu();
         Tracked t = tracked;
@@ -134,7 +134,7 @@ public final class ContainerRecorder {
         ScreenEvents.remove(screen).register(s -> {
             snapshot(mc, t, menu);
             TRACKED.remove(s);
-            if (!t.key().isEntity()) ContainerWatch.ours(t.pos(), t.other());
+            if (!t.key().isEntity()) ContainerWatch.closed(t.pos(), t.other());
             // Carts stacked with this one can't be picked by hand; read them in the background.
             if (t.key().isEntity()) StackScan.closedByHand(t.key().entity());
         });
