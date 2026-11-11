@@ -28,6 +28,8 @@ public final class ClientCrafting {
      */
     public static boolean route(int containerId, RecipeDisplayId recipeId, boolean useMax) {
         Minecraft mc = Minecraft.getInstance();
+        // "Client-only mode" off: the recipe book is vanilla's.
+        if (!ClientConfig.get().actsClientOnly()) return false;
         // Behind a running job, the open menu may be a hidden container: queue it and plan it later.
         if (BackgroundJobs.isBusy()) {
             BackgroundJobs.submit(mc, new QueuedCraft(recipeId, useMax));

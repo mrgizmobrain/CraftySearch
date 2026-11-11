@@ -232,7 +232,8 @@ public final class ContainerWatch {
      */
     private static void recheck(Minecraft mc, long now) {
         LocalPlayer player = mc.player;
-        if (!ClientConfig.get().clientOnly.rechecksUsed() || BackgroundJobs.isBusy()) return;
+        ClientConfig config = ClientConfig.get();
+        if (!config.actsClientOnly() || !config.clientOnly.rechecksUsed() || BackgroundJobs.isBusy()) return;
         if (player.containerMenu != player.inventoryMenu || !player.containerMenu.getCarried().isEmpty()
                 || player.isSecondaryUseActive()) return;
         List<MemoryEntry> due = new ArrayList<>();

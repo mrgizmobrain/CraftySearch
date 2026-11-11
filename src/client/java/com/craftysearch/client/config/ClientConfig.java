@@ -145,6 +145,13 @@ public final class ClientConfig {
     }
 
     public static final class ClientOnly {
+        /**
+         * "Client-only mode" (Nov 11): off, the mod sends nothing of its own on a server without
+         * it. No takes, put-aways, crafts from storage, opening from the panel or background
+         * reads. Containers opened by hand are still remembered and the panel still shows where
+         * things are: neither sends anything, so the server can't tell.
+         */
+        public boolean enabled = true;
         /** Pause between background actions at normal speed. */
         public int packetDelayMs = 50;
         public boolean muteOwnContainerSounds = true;
@@ -221,6 +228,11 @@ public final class ClientConfig {
         return instance;
     }
 
+    /** Whether client-only mode may open and click containers for the player: it's on, and there's a memory to plan from. */
+    public boolean actsClientOnly() {
+        return clientOnly.enabled && memory.enabled;
+    }
+
     public boolean includes(ContainerKind kind) {
         return includeContainerTypes.contains(kind.id());
     }
@@ -286,6 +298,15 @@ public final class ClientConfig {
         if (mouse.shiftRightClick == null) mouse.shiftRightClick = TileClick.SHOW_WHERE;
         clientOnly.packetDelayMs = Math.max(0, clientOnly.packetDelayMs);
         if (clientOnly.speed == null) clientOnly.speed = Speed.NORMAL;
+        if (configVersion < 2) {
+            // "Remember containers" became "Client-only mode" (Nov 11), which leaves remembering on:
+            // whoever had it off wanted the mod to do nothing on such servers.
+            if (!memory.enabled) {
+                clientOnly.enabled = false;
+                memory.enabled = true;
+            }
+            configVersion = 2;
+        }
         if (highlightMarkers == null) highlightMarkers = Markers.WITH_SHADERS;
     }
 }

@@ -249,7 +249,7 @@ public final class StorageIndex {
     public static boolean onlyTakeable() {
         ClientConfig config = ClientConfig.get();
         if (!config.onlyTakeable) return false;
-        return ServerMode.active() ? ServerMode.takeAndPutAwayAllowed() : config.memory.enabled;
+        return ServerMode.active() ? ServerMode.takeAndPutAwayAllowed() : config.actsClientOnly();
     }
 
     /** The radius in use: the client's setting, capped by the server's in server mode. */

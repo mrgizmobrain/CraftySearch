@@ -13,27 +13,35 @@ public final class ClientOnlyConfigScreen extends SettingsScreen {
     @Override
     protected void addSettings(ClientConfig c) {
         ClientConfig.ClientOnly o = c.clientOnly;
-        // One switch over the options anti-cheat may flag (Nov 11). The page is laid out again on a change,
-        // so those show what's in effect, greyed out, while it's on.
+        // The two switches over the rest (Nov 11). The page is laid out again when either changes, so what
+        // they hold back shows greyed out, with what's in effect. Each row is a pair (the user's order).
         add(toggle("anti_cheat_safe", o.antiCheatSafe, v -> {
             o.antiCheatSafe = v;
             rebuildWidgets();
         }));
+        add(toggle("client_only_mode", o.enabled, v -> {
+            o.enabled = v;
+            rebuildWidgets();
+        }));
         add(risky(o, choice("speed", ClientConfig.Speed.values(), o.fast() ? ClientConfig.Speed.FAST : ClientConfig.Speed.NORMAL, v -> o.speed = v)));
-        // Each row is a pair that belongs together (the user's order, Nov 11).
-        add(toggle("memory", c.memory.enabled, v -> c.memory.enabled = v));
         add(toggle("show_stale_age", c.memory.showStaleAge, v -> c.memory.showStaleAge = v));
-        add(risky(o, toggle("scan_stacked_carts", o.scansStackedCarts(), v -> o.scanStackedCarts = v)));
-        add(risky(o, toggle("recheck_used", o.rechecksUsed(), v -> o.recheckUsed = v)));
-        add(toggle("hide_lids", o.hideOwnContainerAnimations, v -> o.hideOwnContainerAnimations = v));
-        add(toggle("mute_sounds", o.muteOwnContainerSounds, v -> o.muteOwnContainerSounds = v));
+        add(acting(o, toggle("hide_lids", o.hideOwnContainerAnimations, v -> o.hideOwnContainerAnimations = v)));
+        add(acting(o, toggle("mute_sounds", o.muteOwnContainerSounds, v -> o.muteOwnContainerSounds = v)));
         add(risky(o, toggle("extra_cart_reach", o.reachesFurtherForCarts(), v -> o.extraCartReach = v)));
         add(risky(o, toggle("extra_block_reach", o.reachesFurtherForBlocks(), v -> o.extraBlockReach = v)));
+        add(risky(o, toggle("scan_stacked_carts", o.scansStackedCarts(), v -> o.scanStackedCarts = v)));
+        add(risky(o, toggle("recheck_used", o.rechecksUsed(), v -> o.recheckUsed = v)));
     }
 
-    /** A setting "Anti-cheat safe" holds at its safe value: it can't be changed while that's on, and keeps its own value for later. */
+    /** A setting about the containers the mod opens: nothing to set with "Client-only mode" off. */
+    private static AbstractWidget acting(ClientConfig.ClientOnly o, AbstractWidget widget) {
+        widget.active = o.enabled;
+        return widget;
+    }
+
+    /** One that "Anti-cheat safe" also holds at its safe value: it can't be changed while that's on, and keeps its own value for later. */
     private static AbstractWidget risky(ClientConfig.ClientOnly o, AbstractWidget widget) {
-        widget.active = !o.antiCheatSafe;
+        widget.active = o.enabled && !o.antiCheatSafe;
         return widget;
     }
 }

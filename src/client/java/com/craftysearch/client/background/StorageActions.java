@@ -255,6 +255,11 @@ public final class StorageActions {
         if (!player.containerMenu.getCarried().isEmpty()) return;
         ItemKey tile = total.key();
         boolean remote = ServerMode.remoteOpenAllowed();
+        // With "Client-only mode" off the mod clicks nothing for the player, a container included.
+        if (!ServerMode.active() && !ClientConfig.get().actsClientOnly()) {
+            locate(mc, total);
+            return;
+        }
         if (!remote && BackgroundJobs.isBusy()) {
             player.sendOverlayMessage(Component.translatable("craftysearch.background.wait_for_storage"));
             return;
@@ -557,11 +562,11 @@ public final class StorageActions {
 
     /**
      * False when taking and putting away can't happen at all: the server turned them off, or
-     * client-only mode remembers no containers. Shift-clicks, drags and the scroll wheel then
+     * "Client-only mode" is off (or remembers no containers). Shift-clicks, drags and the scroll wheel then
      * keep doing what vanilla (or Mouse Tweaks) would.
      */
     public static boolean canMoveItems() {
-        return ServerMode.active() ? ServerMode.takeAndPutAwayAllowed() : ClientConfig.get().memory.enabled;
+        return ServerMode.active() ? ServerMode.takeAndPutAwayAllowed() : ClientConfig.get().actsClientOnly();
     }
 
     /** In server mode, false (after telling the player) when the server turned taking and putting away off. */
