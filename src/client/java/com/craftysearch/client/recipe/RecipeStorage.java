@@ -76,7 +76,7 @@ public final class RecipeStorage {
         reset();
         Player player = mc.player;
         if (player == null) return;
-        // With "Client-only mode" off nothing can be crafted from storage, so the book counts as vanilla does.
+        // With "All interactions" off nothing can be crafted from storage, so the book counts as vanilla does.
         if (!ServerMode.active() && !ClientConfig.get().actsClientOnly()) return;
         List<MemoryEntry> entries = StorageIndex.nearbyEntries(mc);
         List<MemoryEntry> inReach = entries.stream().filter(e -> isReachable(player, e)).toList();

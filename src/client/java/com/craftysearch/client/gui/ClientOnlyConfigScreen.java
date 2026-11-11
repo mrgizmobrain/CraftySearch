@@ -19,7 +19,7 @@ public final class ClientOnlyConfigScreen extends SettingsScreen {
             o.antiCheatSafe = v;
             rebuildWidgets();
         }));
-        add(toggle("client_only_mode", o.enabled, v -> {
+        add(toggle("interactions", o.enabled, v -> {
             o.enabled = v;
             rebuildWidgets();
         }));
@@ -33,7 +33,7 @@ public final class ClientOnlyConfigScreen extends SettingsScreen {
         add(risky(o, toggle("recheck_used", o.rechecksUsed(), v -> o.recheckUsed = v)));
     }
 
-    /** A setting about the containers the mod opens: nothing to set with "Client-only mode" off. */
+    /** A setting about the containers the mod opens: nothing to set with "All interactions" off. */
     private static AbstractWidget acting(ClientConfig.ClientOnly o, AbstractWidget widget) {
         widget.active = o.enabled;
         return widget;

@@ -255,7 +255,7 @@ public final class StorageActions {
         if (!player.containerMenu.getCarried().isEmpty()) return;
         ItemKey tile = total.key();
         boolean remote = ServerMode.remoteOpenAllowed();
-        // With "Client-only mode" off the mod clicks nothing for the player, a container included.
+        // With "All interactions" off the mod clicks nothing for the player, a container included.
         if (!ServerMode.active() && !ClientConfig.get().actsClientOnly()) {
             locate(mc, total);
             return;
@@ -562,7 +562,7 @@ public final class StorageActions {
 
     /**
      * False when taking and putting away can't happen at all: the server turned them off, or
-     * "Client-only mode" is off (or remembers no containers). Shift-clicks, drags and the scroll wheel then
+     * "All interactions" is off (or remembers no containers). Shift-clicks, drags and the scroll wheel then
      * keep doing what vanilla (or Mouse Tweaks) would.
      */
     public static boolean canMoveItems() {

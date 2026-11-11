@@ -146,7 +146,7 @@ public final class ClientConfig {
 
     public static final class ClientOnly {
         /**
-         * "Client-only mode" (Nov 11): off, the mod sends nothing of its own on a server without
+         * "All interactions" (Nov 11): off, the mod sends nothing of its own on a server without
          * it. No takes, put-aways, crafts from storage, opening from the panel or background
          * reads. Containers opened by hand are still remembered and the panel still shows where
          * things are: neither sends anything, so the server can't tell.
@@ -299,7 +299,7 @@ public final class ClientConfig {
         clientOnly.packetDelayMs = Math.max(0, clientOnly.packetDelayMs);
         if (clientOnly.speed == null) clientOnly.speed = Speed.NORMAL;
         if (configVersion < 2) {
-            // "Remember containers" became "Client-only mode" (Nov 11), which leaves remembering on:
+            // "Remember containers" became "All interactions" (Nov 11), which leaves remembering on:
             // whoever had it off wanted the mod to do nothing on such servers.
             if (!memory.enabled) {
                 clientOnly.enabled = false;

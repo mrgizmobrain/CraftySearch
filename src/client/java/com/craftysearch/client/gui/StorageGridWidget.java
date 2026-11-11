@@ -341,8 +341,10 @@ final class StorageGridWidget extends AbstractWidget {
         }
         if (!StorageActions.canMoveItems()) {
             // A click can only show where it is, so that one control shows without Ctrl (Nov 7);
-            // opening the container still works from a right-click set to it.
+            // opening the container still works from a right-click set to it, where a server turned
+            // taking off. With "All interactions" off that shows where too, so the one line says it all.
             lines.add(control("craftysearch.tooltip.click_locates"));
+            if (!ServerMode.active()) return lines;
             if (config.mouse.rightClick == ClientConfig.TileClick.OPEN) lines.add(rightClickLine(false));
             if (config.mouse.shiftRightClick == ClientConfig.TileClick.OPEN) lines.add(rightClickLine(true));
             return lines;
