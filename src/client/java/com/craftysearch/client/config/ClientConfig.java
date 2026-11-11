@@ -45,7 +45,7 @@ public final class ClientConfig {
     public boolean craftIntermediates = true;
     public List<String> includeContainerTypes = new ArrayList<>(ContainerKind.allIds());
     /** Whether the panel's totals count the player's inventory. Crafting always uses it. */
-    public boolean includeInventory = true;
+    public boolean includeInventory = false;
     /** How the panel orders its tiles; changed with the button beside the search box. */
     public PanelSort panelSort = PanelSort.COUNT;
     /** The panel keeps its search text between screens, instead of starting empty. */
@@ -100,7 +100,7 @@ public final class ClientConfig {
         /** What a right-click on a tile does (Nov 9). */
         public TileClick rightClick = TileClick.OPEN;
         /** What a shift-right-click on a tile does (Nov 9). */
-        public TileClick shiftRightClick = TileClick.SHOW_WHERE;
+        public TileClick shiftRightClick = TileClick.TAKE_ALL;
     }
 
     /** What a right-click or shift-right-click on a tile does; either can be any of them (Nov 9). */
@@ -184,7 +184,7 @@ public final class ClientConfig {
          * own values are kept, so turning it off brings them back. Everything but the settings
          * page reads them through the methods below.
          */
-        public boolean antiCheatSafe = false;
+        public boolean antiCheatSafe = true;
 
         public boolean fast() {
             return !antiCheatSafe && speed == Speed.FAST;
@@ -295,7 +295,7 @@ public final class ClientConfig {
         if (mouse == null) mouse = new Mouse();
         if (mouse.scrollDirection == null) mouse.scrollDirection = ScrollDirection.DOWN_TAKES;
         if (mouse.rightClick == null) mouse.rightClick = TileClick.OPEN;
-        if (mouse.shiftRightClick == null) mouse.shiftRightClick = TileClick.SHOW_WHERE;
+        if (mouse.shiftRightClick == null) mouse.shiftRightClick = TileClick.TAKE_ALL;
         clientOnly.packetDelayMs = Math.max(0, clientOnly.packetDelayMs);
         if (clientOnly.speed == null) clientOnly.speed = Speed.NORMAL;
         if (configVersion < 2) {

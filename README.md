@@ -36,7 +36,7 @@ On a tile in the panel:
 | Click | Take a stack onto the cursor |
 | Shift-click | Take a stack straight into the inventory |
 | Right-click | Open the nearest container holding it |
-| Shift-right-click | Show where it is |
+| Shift-right-click | Take all that fits |
 | Middle-click or Alt-click | Show where it is |
 | Scroll | Take one, or put one away, per notch |
 | Ctrl+scroll | A stack per notch |
