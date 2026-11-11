@@ -171,6 +171,33 @@ public final class ClientConfig {
          * default for the same reason as {@link #extraCartReach}.
          */
         public boolean extraBlockReach = false;
+        /**
+         * "Anti-cheat safe" (Nov 11): one switch over the five options above that an anti-cheat
+         * plugin may flag. On, they act as Normal speed and off, whatever they're set to; their
+         * own values are kept, so turning it off brings them back. Everything but the settings
+         * page reads them through the methods below.
+         */
+        public boolean antiCheatSafe = false;
+
+        public boolean fast() {
+            return !antiCheatSafe && speed == Speed.FAST;
+        }
+
+        public boolean scansStackedCarts() {
+            return !antiCheatSafe && scanStackedCarts;
+        }
+
+        public boolean rechecksUsed() {
+            return !antiCheatSafe && recheckUsed;
+        }
+
+        public boolean reachesFurtherForCarts() {
+            return !antiCheatSafe && extraCartReach;
+        }
+
+        public boolean reachesFurtherForBlocks() {
+            return !antiCheatSafe && extraBlockReach;
+        }
     }
 
     public enum Speed {

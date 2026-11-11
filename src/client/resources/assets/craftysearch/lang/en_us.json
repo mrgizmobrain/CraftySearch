@@ -156,6 +156,8 @@
   "craftysearch.config.client_only_button": "Client-only mode...",
   "craftysearch.config.client_only.title": "Client-only Mode",
   "craftysearch.config.client_only.note": "Used on servers without Crafty Search",
+  "craftysearch.config.anti_cheat_safe": "Anti-cheat safe",
+  "craftysearch.config.anti_cheat_safe.tooltip": "On: Normal speed, and Scan stacked carts, Extra block reach, Extra cart reach and Recheck used are off. Their own settings are kept.\nOff: Each of them follows its own setting.\nWarning: Containers are still opened in the background. No setting can promise an anti-cheat won't flag that.",
   "craftysearch.config.speed": "Speed",
   "craftysearch.config.speed.normal": "Normal",
   "craftysearch.config.speed.fast": "Fast",

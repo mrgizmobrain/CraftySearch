@@ -196,7 +196,7 @@ public final class RecipeStorage {
      * may check closer than the server does.
      */
     public static boolean canReach(Player player, BlockPos pos) {
-        double extra = ClientConfig.get().clientOnly.extraBlockReach ? EXTRA_BLOCK_REACH : 0.0;
+        double extra = ClientConfig.get().clientOnly.reachesFurtherForBlocks() ? EXTRA_BLOCK_REACH : 0.0;
         return player.isWithinBlockInteractionRange(pos, extra);
     }
 
@@ -207,7 +207,7 @@ public final class RecipeStorage {
      * block for movement and lag.
      */
     public static boolean canReach(Player player, Entity cart) {
-        double extra = ClientConfig.get().clientOnly.extraCartReach ? EXTRA_CART_REACH : 0.0;
+        double extra = ClientConfig.get().clientOnly.reachesFurtherForCarts() ? EXTRA_CART_REACH : 0.0;
         return !cart.isRemoved() && player.isWithinEntityInteractionRange(cart.getBoundingBox(), extra);
     }
 

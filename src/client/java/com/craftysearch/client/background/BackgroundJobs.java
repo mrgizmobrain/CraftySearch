@@ -329,7 +329,7 @@ public final class BackgroundJobs {
     }
 
     private static boolean fast() {
-        return ClientConfig.get().clientOnly.speed == ClientConfig.Speed.FAST;
+        return ClientConfig.get().clientOnly.fast();
     }
 
     /**

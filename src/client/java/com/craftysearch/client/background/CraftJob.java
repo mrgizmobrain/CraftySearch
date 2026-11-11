@@ -338,7 +338,7 @@ final class CraftJob extends BackgroundJob {
     }
 
     private static boolean fast() {
-        return ClientConfig.get().clientOnly.speed == ClientConfig.Speed.FAST;
+        return ClientConfig.get().clientOnly.fast();
     }
 
     private static int latency(Minecraft mc) {
