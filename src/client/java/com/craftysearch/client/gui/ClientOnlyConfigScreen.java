@@ -19,16 +19,16 @@ public final class ClientOnlyConfigScreen extends SettingsScreen {
             o.antiCheatSafe = v;
             rebuildWidgets();
         }));
+        add(risky(o, choice("speed", ClientConfig.Speed.values(), o.fast() ? ClientConfig.Speed.FAST : ClientConfig.Speed.NORMAL, v -> o.speed = v)));
+        // Each row is a pair that belongs together (the user's order, Nov 11).
         add(toggle("memory", c.memory.enabled, v -> c.memory.enabled = v));
         add(toggle("show_stale_age", c.memory.showStaleAge, v -> c.memory.showStaleAge = v));
-        add(risky(o, choice("speed", ClientConfig.Speed.values(), o.fast() ? ClientConfig.Speed.FAST : ClientConfig.Speed.NORMAL, v -> o.speed = v)));
-        // "Exact amounts" is gone (Nov 9): exact takes cost a few clicks now, and repeated clicks come as one.
         add(risky(o, toggle("scan_stacked_carts", o.scansStackedCarts(), v -> o.scanStackedCarts = v)));
-        add(toggle("mute_sounds", o.muteOwnContainerSounds, v -> o.muteOwnContainerSounds = v));
-        add(toggle("hide_lids", o.hideOwnContainerAnimations, v -> o.hideOwnContainerAnimations = v));
-        add(risky(o, toggle("extra_block_reach", o.reachesFurtherForBlocks(), v -> o.extraBlockReach = v)));
-        add(risky(o, toggle("extra_cart_reach", o.reachesFurtherForCarts(), v -> o.extraCartReach = v)));
         add(risky(o, toggle("recheck_used", o.rechecksUsed(), v -> o.recheckUsed = v)));
+        add(toggle("hide_lids", o.hideOwnContainerAnimations, v -> o.hideOwnContainerAnimations = v));
+        add(toggle("mute_sounds", o.muteOwnContainerSounds, v -> o.muteOwnContainerSounds = v));
+        add(risky(o, toggle("extra_cart_reach", o.reachesFurtherForCarts(), v -> o.extraCartReach = v)));
+        add(risky(o, toggle("extra_block_reach", o.reachesFurtherForBlocks(), v -> o.extraBlockReach = v)));
     }
 
     /** A setting "Anti-cheat safe" holds at its safe value: it can't be changed while that's on, and keeps its own value for later. */

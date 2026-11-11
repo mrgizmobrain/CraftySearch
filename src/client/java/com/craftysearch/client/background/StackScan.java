@@ -66,7 +66,7 @@ public final class StackScan {
         if (cart == null) return;
         closed = null;
         ClientConfig config = ClientConfig.get();
-        if (!config.clientOnly.scansStackedCarts() ||!config.memory.enabled || ServerMode.active()) return;
+        if (!config.clientOnly.scansStackedCarts() || !config.memory.enabled || ServerMode.active()) return;
         if (mc.gui.screen() != null || mc.player == null || mc.level == null) return;
         Entity opened = mc.level.getEntity(cart);
         if (opened == null) return;
