@@ -156,6 +156,12 @@ public final class ClientConfig {
          */
         public boolean scanStackedCarts = true;
         /**
+         * A container someone else has used ({@code ContainerWatch}) is opened in the background
+         * to read it again, once it's closed and within reach. Each is a real opening on the
+         * server, which others see and anti-cheat plugins may flag, so it's off by default.
+         */
+        public boolean recheckUsed = false;
+        /**
          * Reaches carts and boats 2.5 blocks beyond the crosshair's range, close to the 3 the
          * server allows. Anti-cheat plugins check reach closely, so it's off by default.
          */

@@ -1,5 +1,6 @@
 package com.craftysearch.client.memory;
 
+import com.craftysearch.client.background.ContainerWatch;
 import com.craftysearch.client.background.StackScan;
 import com.craftysearch.client.config.ClientConfig;
 import com.craftysearch.client.highlight.Highlights;
@@ -91,6 +92,12 @@ public final class ContainerRecorder {
         pendingAt = System.currentTimeMillis();
     }
 
+    /** True while the player has the container at {@code pos} (either half of a double chest) open on screen. */
+    public static boolean hasOpen(Minecraft mc, BlockPos pos) {
+        Tracked tracked = TRACKED.get(mc.gui.screen());
+        return tracked != null && !tracked.key().isEntity() && (tracked.pos().equals(pos) || pos.equals(tracked.other()));
+    }
+
     /** The block the player right-clicked in the last few seconds, if any. */
     public static @Nullable BlockPos recentlyUsedBlock() {
         return System.currentTimeMillis() - lastUsedAt <= MATCH_WINDOW_MILLIS ? lastUsedPos : null;
@@ -116,6 +123,7 @@ public final class ContainerRecorder {
             tracked = startTracking(mc, screen);
             if (tracked == null) return;
             TRACKED.put(screen, tracked);
+            if (!tracked.key().isEntity()) ContainerWatch.ours(tracked.pos(), tracked.other());
         }
         AbstractContainerMenu menu = ((AbstractContainerScreen<?>) screen).getMenu();
         Tracked t = tracked;
@@ -126,6 +134,7 @@ public final class ContainerRecorder {
         ScreenEvents.remove(screen).register(s -> {
             snapshot(mc, t, menu);
             TRACKED.remove(s);
+            if (!t.key().isEntity()) ContainerWatch.ours(t.pos(), t.other());
             // Carts stacked with this one can't be picked by hand; read them in the background.
             if (t.key().isEntity()) StackScan.closedByHand(t.key().entity());
         });

@@ -1,5 +1,6 @@
 package com.craftysearch.server;
 
+import com.craftysearch.CraftySearch;
 import com.craftysearch.ServerConfig;
 import com.craftysearch.network.StorageUpdatePayload;
 import com.craftysearch.network.SubscribePayload;
@@ -24,12 +25,22 @@ import java.util.UUID;
 
 /**
  * Keeps each subscribed client's view of nearby containers up to date (spec 4.1, live
- * data). Every few ticks it rescans and sends only the containers that changed.
+ * data). Every few ticks it rescans and sends only the containers that changed; a player
+ * the mod just moved items for is rescanned in the same tick.
  */
 public final class StorageSync {
     private static final int INTERVAL_TICKS = 10;
     private static final int CONTAINERS_PER_PAYLOAD = 64;
+    private static final int REPORT_INTERVAL_TICKS = 20 * 60;
+    /** A tick's scans taking this long (a tenth of a tick) are worth a line in the log. */
+    private static final double SLOW_MILLIS = 5.0;
     private static final Map<UUID, Subscription> SUBSCRIPTIONS = new HashMap<>();
+    /** Players the mod moved items for this tick. */
+    private static final Set<UUID> CHANGED = new HashSet<>();
+    private static long timedNanos;
+    private static long slowestNanos;
+    private static int timedScans;
+    private static int timedSince;
 
     private static final class Subscription {
         final int radius;
@@ -59,18 +70,64 @@ public final class StorageSync {
 
     public static void remove(ServerPlayer player) {
         SUBSCRIPTIONS.remove(player.getUUID());
+        CHANGED.remove(player.getUUID());
     }
 
     public static void clear() {
         SUBSCRIPTIONS.clear();
+        CHANGED.clear();
+        timedSince = 0;
+    }
+
+    /**
+     * The mod just moved items for this player (a take, a put-away, a craft): their update goes
+     * out at the end of this tick instead of at the next interval, so the panel's counts change
+     * with the click rather than up to half a second later (Nov 10).
+     */
+    public static void changedBy(ServerPlayer player) {
+        if (SUBSCRIPTIONS.containsKey(player.getUUID())) CHANGED.add(player.getUUID());
     }
 
     public static void tick(MinecraftServer server) {
-        if (SUBSCRIPTIONS.isEmpty() || server.getTickCount() % INTERVAL_TICKS != 0) return;
+        if (SUBSCRIPTIONS.isEmpty()) return;
+        boolean everyone = server.getTickCount() % INTERVAL_TICKS == 0;
+        if (!everyone && CHANGED.isEmpty()) return;
+        long start = System.nanoTime();
+        int synced = 0;
         for (Map.Entry<UUID, Subscription> entry : SUBSCRIPTIONS.entrySet()) {
+            if (!everyone && !CHANGED.contains(entry.getKey())) continue;
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
-            if (player != null) sync(player, entry.getValue());
+            if (player == null) continue;
+            sync(player, entry.getValue());
+            synced++;
         }
+        CHANGED.clear();
+        if (synced > 0) time(server, System.nanoTime() - start, synced);
+    }
+
+    /**
+     * Once a minute, how long the scans took: in the debug log, or as a warning when one tick's
+     * scans took long enough to matter, so a server with a lot of storage in range can tell.
+     */
+    private static void time(MinecraftServer server, long nanos, int synced) {
+        timedNanos += nanos;
+        timedScans += synced;
+        slowestNanos = Math.max(slowestNanos, nanos);
+        if (server.getTickCount() - timedSince < REPORT_INTERVAL_TICKS) return;
+        double average = timedNanos / 1e6 / Math.max(1, timedScans);
+        double slowest = slowestNanos / 1e6;
+        if (slowest >= SLOW_MILLIS) {
+            CraftySearch.LOGGER.warn("Storage scans are slow: {} in the last minute, {} ms each on average, {} ms in the slowest tick."
+                    + " A smaller maxRadius in craftysearch-server.json makes them cheaper.",
+                    timedScans, String.format("%.2f", average), String.format("%.2f", slowest));
+        } else {
+            CraftySearch.LOGGER.debug("Storage scans: {} in the last minute, {} ms each on average, {} ms in the slowest tick",
+                    timedScans, String.format("%.2f", average), String.format("%.2f", slowest));
+        }
+        timedSince = server.getTickCount();
+        timedNanos = 0;
+        timedScans = 0;
+        slowestNanos = 0;
     }
 
     private static void sync(ServerPlayer player, Subscription sub) {

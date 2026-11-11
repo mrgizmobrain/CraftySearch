@@ -13,6 +13,7 @@ import com.craftysearch.client.memory.ContainerMemory;
 import com.craftysearch.client.memory.ContainerRecorder;
 import com.craftysearch.client.recipe.CraftChains;
 import com.craftysearch.client.recipe.RecipeStorage;
+import com.craftysearch.client.storage.StorageIndex;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -55,6 +56,7 @@ public class CraftySearchClient implements ClientModInitializer {
             // Both hold on to the world through their recipe index; let it be freed.
             RecipeStorage.reset();
             CraftChains.clearCache();
+            StorageIndex.clearCache();
         });
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> ContainerMemory.get().close());
         ClientTickEvents.END_CLIENT_TICK.register(CraftySearchClient::tick);

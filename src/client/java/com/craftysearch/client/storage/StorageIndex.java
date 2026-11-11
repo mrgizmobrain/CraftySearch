@@ -1,5 +1,6 @@
 package com.craftysearch.client.storage;
 
+import com.craftysearch.CraftySearch;
 import com.craftysearch.client.config.ClientConfig;
 import com.craftysearch.client.live.LiveStorage;
 import com.craftysearch.client.live.ServerMode;
@@ -13,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.locale.Language;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.level.Level;
@@ -21,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -50,16 +53,78 @@ public final class StorageIndex {
      * @param looseContainers how many of {@code sources} hold it loose
      * @param boxContainers  how many of {@code sources} hold it inside shulker boxes (a container may count in both)
      * @param oldestSeenMillis when the stalest of those containers was last seen, or 0 if none
+     * @param suspectContainers how many of {@code sources} someone else has used since they were read
+     *                       (client-only mode), so their counts may be off
      */
     public record ItemTotal(ItemKey key, long total, long inInventory, long inStorage, long inBoxes,
-                            List<MemoryEntry> sources, int looseContainers, int boxContainers, long oldestSeenMillis) {
+                            List<MemoryEntry> sources, int looseContainers, int boxContainers, long oldestSeenMillis,
+                            int suspectContainers) {
         public ItemStack display() {
             return key.stack();
         }
     }
 
+    /** What a tile sorts by. Kept between recounts (Nov 10): working out names is most of a recount's cost. */
+    private record SortInfo(String name, String enchantments, String mod) {
+        static SortInfo of(ItemKey key) {
+            ItemStack stack = key.stack();
+            return new SortInfo(stack.getHoverName().getString(), SearchFilter.sortKey(stack),
+                    BuiltInRegistries.ITEM.getKey(stack.getItem()).getNamespace());
+        }
+    }
+
+    private static final int SORT_INFO_LIMIT = 20_000;
+    private static final Map<ItemKey, SortInfo> SORT_INFO = new HashMap<>();
+    /** The language the kept names are in. */
+    private static @Nullable Language sortLanguage;
+
+    private static final long REPORT_INTERVAL_MILLIS = 60_000;
+    /** A recount this long is a visible hitch in the frame it runs in. */
+    private static final double SLOW_MILLIS = 10.0;
+    private static long timedNanos;
+    private static long slowestNanos;
+    private static int timedRecounts;
+    private static long timedSince;
+
+    /** Drops the kept names on leaving a world: their items hold on to that world's registries. */
+    public static void clearCache() {
+        SORT_INFO.clear();
+        sortLanguage = null;
+    }
+
+    /** Every tile's totals, in the panel's order. */
     public static List<ItemTotal> compute(Minecraft mc) {
         if (mc.player == null || mc.level == null) return List.of();
+        long start = System.nanoTime();
+        List<ItemTotal> totals = count(mc);
+        time(System.nanoTime() - start, totals.size());
+        return totals;
+    }
+
+    /** Once a minute, how long recounts took: in the debug log, or as a warning when one was slow enough to see. */
+    private static void time(long nanos, int tiles) {
+        timedNanos += nanos;
+        timedRecounts++;
+        slowestNanos = Math.max(slowestNanos, nanos);
+        long now = System.currentTimeMillis();
+        if (timedSince == 0) timedSince = now;
+        if (now - timedSince < REPORT_INTERVAL_MILLIS) return;
+        String average = String.format(Locale.ROOT, "%.2f", timedNanos / 1e6 / timedRecounts);
+        String slowest = String.format(Locale.ROOT, "%.2f", slowestNanos / 1e6);
+        if (slowestNanos / 1e6 >= SLOW_MILLIS) {
+            CraftySearch.LOGGER.warn("Storage recounts are slow: {} in the last minute, {} ms on average, {} ms the slowest, {} tiles",
+                    timedRecounts, average, slowest, tiles);
+        } else {
+            CraftySearch.LOGGER.debug("Storage recounts: {} in the last minute, {} ms on average, {} ms the slowest, {} tiles",
+                    timedRecounts, average, slowest, tiles);
+        }
+        timedSince = now;
+        timedNanos = 0;
+        slowestNanos = 0;
+        timedRecounts = 0;
+    }
+
+    private static List<ItemTotal> count(Minecraft mc) {
         ClientConfig config = ClientConfig.get();
         boolean countInventory = config.includeInventory;
         boolean lookInBoxes = config.shulkerContents;
@@ -96,16 +161,18 @@ public final class StorageIndex {
             }
         }
 
-        // Names and enchantments are worked out once per tile, not in every comparison: a big
-        // storage has thousands of tiles, recounted every second while the panel shows.
+        // Names and enchantments are worked out once per tile, not in every comparison or every
+        // recount: a big storage has thousands of tiles, recounted every second while the panel shows.
+        Language language = Language.getInstance();
+        if (language != sortLanguage || SORT_INFO.size() > SORT_INFO_LIMIT) {
+            SORT_INFO.clear();
+            sortLanguage = language;
+        }
         List<Sorted> sorted = new ArrayList<>(builders.size());
         for (Builder b : builders.values()) {
             // Without the inventory, or showing only what can be taken, items only in the inventory get no tile.
             if ((!countInventory || onlyTakeable) && b.storage == 0 && b.boxes == 0) continue;
-            ItemTotal total = b.build(countInventory);
-            ItemStack stack = total.display();
-            sorted.add(new Sorted(total, stack.getHoverName().getString(), SearchFilter.sortKey(stack),
-                    BuiltInRegistries.ITEM.getKey(stack.getItem()).getNamespace()));
+            sorted.add(new Sorted(b.build(countInventory), SORT_INFO.computeIfAbsent(b.key, SortInfo::of)));
         }
         sorted.sort(order(ClientConfig.get().panelSort));
         return sorted.stream().map(Sorted::total).toList();
@@ -114,15 +181,16 @@ public final class StorageIndex {
     /** Enchanted copies share a name, so ties are broken by enchantment, to keep tiles from swapping places. */
     private static Comparator<Sorted> order(ClientConfig.PanelSort sort) {
         Comparator<Sorted> byCount = Comparator.comparingLong((Sorted s) -> s.total().total()).reversed();
-        Comparator<Sorted> byName = Comparator.comparing(Sorted::name, String.CASE_INSENSITIVE_ORDER).thenComparing(Sorted::enchantments);
+        Comparator<Sorted> byName = Comparator.comparing((Sorted s) -> s.info().name(), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(s -> s.info().enchantments());
         return switch (sort) {
             case COUNT -> byCount.thenComparing(byName);
             case NAME -> byName.thenComparing(byCount);
-            case MOD -> Comparator.comparing(Sorted::mod).thenComparing(byName).thenComparing(byCount);
+            case MOD -> Comparator.comparing((Sorted s) -> s.info().mod()).thenComparing(byName).thenComparing(byCount);
         };
     }
 
-    private record Sorted(ItemTotal total, String name, String enchantments, String mod) {
+    private record Sorted(ItemTotal total, SortInfo info) {
     }
 
     /** A count for a tile or a label: 999, then 1.2k, then 3.4M. */
@@ -224,6 +292,7 @@ public final class StorageIndex {
         final List<MemoryEntry> sources = new ArrayList<>();
         int looseContainers;
         int boxContainers;
+        int suspectContainers;
         private @Nullable MemoryEntry lastLoose;
         private @Nullable MemoryEntry lastBoxed;
         long oldestSeen;
@@ -256,14 +325,17 @@ public final class StorageIndex {
          * last one listed is the only one that can repeat.
          */
         private void seenIn(MemoryEntry entry) {
-            if (sources.isEmpty() || sources.getLast() != entry) sources.add(entry);
+            if (sources.isEmpty() || sources.getLast() != entry) {
+                sources.add(entry);
+                if (entry.suspect()) suspectContainers++;
+            }
             oldestSeen = oldestSeen == 0 ? entry.lastSeenMillis() : Math.min(oldestSeen, entry.lastSeenMillis());
         }
 
         ItemTotal build(boolean countInventory) {
             long total = (countInventory ? inventory : 0) + storage + boxes;
             return new ItemTotal(key, total, inventory, storage, boxes, List.copyOf(sources), looseContainers, boxContainers,
-                    oldestSeen);
+                    oldestSeen, suspectContainers);
         }
     }
 }

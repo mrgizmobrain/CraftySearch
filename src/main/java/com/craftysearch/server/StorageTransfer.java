@@ -75,6 +75,7 @@ public final class StorageTransfer {
         if (!allowed(server, player) || request.items().isEmpty()) return;
         boolean toCursor = request.has(TakePayload.TO_CURSOR);
         if (toCursor && request.items().size() > 1) return;
+        StorageSync.changedBy(player);
 
         List<Found> found = nearestFirst(player, request.radius(), ContainerKind.fromMask(request.kindsMask()));
         KeptSlots kept = KeptSlots.of(found, request.has(TakePayload.KEEP_ONE));
@@ -175,6 +176,7 @@ public final class StorageTransfer {
      */
     public static void putAway(MinecraftServer server, ServerPlayer player, PutAwayPayload request) {
         if (!allowed(server, player) || request.slots().isEmpty()) return;
+        StorageSync.changedBy(player);
         Set<ContainerKind> kinds = ContainerKind.fromMask(request.kindsMask()).stream()
                 .filter(ContainerKind::acceptsPutAway).collect(Collectors.toSet());
         List<Found> found = nearestFirst(player, request.radius(), kinds);

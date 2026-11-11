@@ -57,6 +57,8 @@ final class StorageGridWidget extends AbstractWidget {
     /** Slot-coloured veil over a tile that has run out. */
     private static final int EMPTY_TILE_COLOR = 0xB08B8B8B;
     private static final int LABEL_COLOR = 0xFF404040;
+    /** The corner mark on a tile whose count may be off. */
+    private static final int SUSPECT_COLOR = 0xFFFFA000;
 
     private final Font font;
     private final Supplier<String> query;
@@ -138,7 +140,7 @@ final class StorageGridWidget extends AbstractWidget {
         List<ItemTotal> result = new ArrayList<>(fresh.size() + 4);
         for (ItemTotal old : previous) {
             ItemTotal now = byKey.remove(old.key());
-            result.add(now != null ? now : new ItemTotal(old.key(), 0, 0, 0, 0, List.of(), 0, 0, 0));
+            result.add(now != null ? now : new ItemTotal(old.key(), 0, 0, 0, 0, List.of(), 0, 0, 0, 0));
         }
         result.addAll(byKey.values());
         return result;
@@ -201,6 +203,8 @@ final class StorageGridWidget extends AbstractWidget {
                 g.item(total.display(), x + 1, y + 1);
                 if (total.total() > 0) {
                     g.itemDecorations(font, total.display(), x + 1, y + 1, StorageIndex.formatCount(total.total()));
+                    // Someone else used one of its containers since it was read: a small mark in the corner.
+                    if (total.suspectContainers() > 0) g.fill(x + 1, y + 1, x + 4, y + 4, SUSPECT_COLOR);
                 } else {
                     // A placeholder kept in place while the player clicks: none left.
                     g.fill(x + 1, y + 1, x + 17, y + 17, EMPTY_TILE_COLOR);
@@ -329,6 +333,10 @@ final class StorageGridWidget extends AbstractWidget {
                     ? Component.translatable("craftysearch.tooltip.in_boxes_containers", total.inBoxes(), total.boxContainers())
                     : Component.translatable("craftysearch.tooltip.in_boxes", total.inBoxes());
             lines.add(boxed.copy().withStyle(ChatFormatting.GRAY));
+        }
+        if (total.suspectContainers() > 0 && !ServerMode.active()) {
+            // Client-only memory can't see what others do; it only saw them open the container.
+            lines.add(Component.translatable("craftysearch.tooltip.suspect", total.suspectContainers()).withStyle(ChatFormatting.GOLD));
         }
         if (!StorageActions.canMoveItems()) {
             // A click can only show where it is, so that one control shows without Ctrl (Nov 7);

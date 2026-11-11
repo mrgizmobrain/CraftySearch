@@ -2,6 +2,7 @@ package com.craftysearch.storage;
 
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An item type plus its data components (enchantments, potion, custom name), usable as a
@@ -11,6 +12,8 @@ import net.minecraft.world.item.ItemStack;
 public final class ItemKey {
     private final ItemStack stack;
     private final int hash;
+    /** {@link #normalized()}, once asked for. */
+    private @Nullable ItemKey normalized;
 
     private ItemKey(ItemStack stack) {
         this.stack = stack;
@@ -33,8 +36,19 @@ public final class ItemKey {
         return new ItemKey(copy);
     }
 
+    /**
+     * This key's tile. Worked out once: the panel asks for it on every recount, for every item
+     * in every container, and a key that's already a tile's (nothing worn, no repair cost) is
+     * its own without copying the stack (Nov 10).
+     */
     public ItemKey normalized() {
-        return normalized(stack);
+        ItemKey tile = normalized;
+        if (tile == null) {
+            boolean plain = !stack.isDamaged() && stack.getOrDefault(DataComponents.REPAIR_COST, 0) == 0;
+            tile = plain ? this : normalized(stack);
+            normalized = tile;
+        }
+        return tile;
     }
 
     /** Whether {@code stack} belongs to this (normalized) tile. Checks the item first, since normalizing copies. */

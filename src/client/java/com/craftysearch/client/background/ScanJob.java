@@ -9,12 +9,17 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 
 /**
- * Opens carts and boats only to record them (spec 5.1): as an automatic job, the runner
- * records each container when its contents arrive and closes it again at once.
+ * Opens containers only to record them: stacked carts and boats (spec 5.1), and containers
+ * someone else has used ({@link ContainerWatch}). As an automatic job, the runner records
+ * each container when its contents arrive and closes it again at once.
  */
 final class ScanJob extends BackgroundJob {
-    ScanJob(List<MemoryEntry> carts) {
-        super(carts);
+    private final String progressKey;
+
+    /** {@code progressKey}: the progress line's translation key, taking "n of total". */
+    ScanJob(List<MemoryEntry> containers, String progressKey) {
+        super(containers);
+        this.progressKey = progressKey;
     }
 
     @Override
@@ -24,13 +29,13 @@ final class ScanJob extends BackgroundJob {
 
     @Override
     @Nullable BackgroundJob rest(int next) {
-        List<MemoryEntry> carts = containers();
-        return next >= carts.size() ? null : new ScanJob(List.copyOf(carts.subList(next, carts.size())));
+        List<MemoryEntry> all = containers();
+        return next >= all.size() ? null : new ScanJob(List.copyOf(all.subList(next, all.size())), progressKey);
     }
 
     @Override
     Component progress(int index, int total, boolean finishing) {
-        return Component.translatable("craftysearch.background.scanning", index, total);
+        return Component.translatable(progressKey, index, total);
     }
 
     @Override

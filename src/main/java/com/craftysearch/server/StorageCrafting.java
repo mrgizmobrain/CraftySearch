@@ -86,6 +86,7 @@ public final class StorageCrafting {
         RecipeHolder<?> holder = info.parent();
         if (!player.getRecipeBook().contains(holder.id()) || holder.value().placementInfo().isImpossibleToPlace()) return;
         if (request.steps().size() > CraftRequestPayload.MAX_STEPS) return;
+        StorageSync.changedBy(player);
 
         List<Found> found = StorageScanner.scan(player, StorageSync.clampRadius(request.radius()),
                 ContainerKind.fromMask(request.kindsMask()));

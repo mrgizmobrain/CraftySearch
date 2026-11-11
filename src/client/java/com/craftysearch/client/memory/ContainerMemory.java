@@ -138,6 +138,21 @@ public final class ContainerMemory {
         changed(dim, before, entry);
     }
 
+    /**
+     * Someone else used the container at {@code pos} (either half of a double chest): what's
+     * remembered may no longer be what's inside, until it's read again. Returns true if a
+     * remembered container was newly marked.
+     */
+    public boolean markSuspect(ResourceKey<Level> dimension, BlockPos pos) {
+        Dimension dim = dimension(dimension);
+        ContainerKey key = dim == null ? null : dim.index.get(pos);
+        MemoryEntry entry = key == null ? null : dim.entries.get(key);
+        if (entry == null || entry.suspect()) return false;
+        dim.put(entry.asSuspect());
+        changed(dim);
+        return true;
+    }
+
     public void tick(Minecraft mc) {
         if (worldDir == null || mc.level == null || mc.player == null) return;
         ticks++;
@@ -212,8 +227,9 @@ public final class ContainerMemory {
      * panel and recipe book needn't recount.
      */
     private void changed(Dimension dim, @Nullable MemoryEntry before, MemoryEntry after) {
-        boolean same = before != null && before.kind() == after.kind() && Objects.equals(before.other(), after.other())
-                && before.counts().equals(after.counts());
+        // A container marked as used by someone else is read again now, so its mark goes: that shows too.
+        boolean same = before != null && !before.suspect() && before.kind() == after.kind()
+                && Objects.equals(before.other(), after.other()) && before.counts().equals(after.counts());
         if (same) dim.dirty = true;
         else changed(dim);
     }
@@ -305,6 +321,7 @@ public final class ContainerMemory {
     /**
      * v2: {@code "items": [{"stack": <vanilla item JSON, components included>, "count": n}, ...]}.
      * v3: a cart or boat has {@code "entity": "<uuid>"}, and {@code "pos"} is where it was last seen.
+     * {@code "suspect": true} (Nov 10, optional): someone else has used it since.
      */
     private static JsonObject writeEntry(MemoryEntry entry, RegistryOps<JsonElement> ops) {
         JsonObject json = new JsonObject();
@@ -313,6 +330,7 @@ public final class ContainerMemory {
         if (entry.entity() != null) json.addProperty("entity", entry.entity().toString());
         json.addProperty("kind", entry.kind().id());
         json.addProperty("seen", entry.lastSeenMillis());
+        if (entry.suspect()) json.addProperty("suspect", true);
         JsonArray items = new JsonArray();
         for (Object2IntMap.Entry<ItemKey> e : entry.counts().object2IntEntrySet()) {
             ItemStack.CODEC.encodeStart(ops, e.getKey().stack())
@@ -354,7 +372,8 @@ public final class ContainerMemory {
         // v1 and v2 only had blocks.
         UUID entity = json.has("entity") ? UUID.fromString(json.get("entity").getAsString()) : null;
         if ((entity != null) != kind.isEntity()) return null;
-        return new MemoryEntry(readPos(json.getAsJsonArray("pos")), other, entity, kind, json.get("seen").getAsLong(), counts);
+        boolean suspect = json.has("suspect") && json.get("suspect").getAsBoolean();
+        return new MemoryEntry(readPos(json.getAsJsonArray("pos")), other, entity, kind, json.get("seen").getAsLong(), counts, suspect);
     }
 
     private static JsonArray writePos(BlockPos pos) {

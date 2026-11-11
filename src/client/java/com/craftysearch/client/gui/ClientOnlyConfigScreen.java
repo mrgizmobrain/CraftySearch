@@ -20,5 +20,6 @@ public final class ClientOnlyConfigScreen extends SettingsScreen {
         add(toggle("hide_lids", c.clientOnly.hideOwnContainerAnimations, v -> c.clientOnly.hideOwnContainerAnimations = v));
         add(toggle("extra_block_reach", c.clientOnly.extraBlockReach, v -> c.clientOnly.extraBlockReach = v));
         add(toggle("extra_cart_reach", c.clientOnly.extraCartReach, v -> c.clientOnly.extraCartReach = v));
+        add(toggle("recheck_used", c.clientOnly.recheckUsed, v -> c.clientOnly.recheckUsed = v));
     }
 }

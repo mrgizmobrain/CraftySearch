@@ -1,6 +1,7 @@
 package com.craftysearch.client.mixin;
 
 import com.craftysearch.client.background.BackgroundAccess;
+import com.craftysearch.client.background.ContainerWatch;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
@@ -44,6 +45,8 @@ abstract class ClientPacketListenerMixin {
     @Inject(method = "handleBlockEvent", cancellable = true,
             at = @At(value = "INVOKE", target = ON_CLIENT_THREAD, shift = At.Shift.AFTER))
     private void craftysearch$hideBackgroundLid(ClientboundBlockEventPacket packet, CallbackInfo ci) {
+        // A lid moving that isn't this player's doing: someone else is using that container.
+        ContainerWatch.lidEvent(Minecraft.getInstance(), packet.getPos(), packet.getB0(), packet.getB1());
         if (BackgroundAccess.shouldHideBlockEvent(packet.getPos())) ci.cancel();
     }
 }

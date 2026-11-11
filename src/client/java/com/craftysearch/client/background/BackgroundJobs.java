@@ -125,6 +125,7 @@ public final class BackgroundJobs {
     public static void register() {
         ScreenEvents.AFTER_INIT.register(BackgroundJobs::afterInit);
         ClientTickEvents.END_CLIENT_TICK.register(StackScan::tick);
+        ClientTickEvents.END_CLIENT_TICK.register(ContainerWatch::tick);
         ClientTickEvents.END_CLIENT_TICK.register(BackgroundJobs::tick);
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> playerInteracted(level));
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> playerInteracted(level));
@@ -218,6 +219,12 @@ public final class BackgroundJobs {
         return isBusy() || screenShowsAnotherMenu();
     }
 
+    /** True while a job has the container at {@code pos} (either half of a double chest) open, or is opening it. */
+    static boolean hasOpen(BlockPos pos) {
+        Running r = running;
+        return r != null && r.current != null && !r.current.isEntity() && r.current.contains(pos);
+    }
+
     /** True while a job runs or waits in the queue: new requests should be queued too. */
     public static boolean isBusy() {
         return running != null || !QUEUE.isEmpty();
@@ -246,6 +253,7 @@ public final class BackgroundJobs {
         suspended = null;
         QUEUE.clear();
         BackgroundAccess.reset();
+        ContainerWatch.clear();
     }
 
     /** Runs the request now, or queues it behind the running job. An automatic job steps aside for it. */
@@ -482,6 +490,7 @@ public final class BackgroundJobs {
         int closing = r.table != null && !r.tableClosed ? mc.player.containerMenu.containerId : -1;
         if (!BackgroundAccess.open(mc, entry, TIMEOUT_MILLIS, closing)) return;
         r.current = entry;
+        ContainerWatch.ours(entry);
         if (r.table != null) r.tableClosed = true;
         r.step = Step.WAIT_OPEN;
         r.waitUntil = now + TIMEOUT_MILLIS;
@@ -506,6 +515,7 @@ public final class BackgroundJobs {
             // screen the player opened meanwhile closes whatever menu is open, so a menu left
             // open for another step could be closed under the job.
             BackgroundAccess.closeHidden(mc);
+            ContainerWatch.ours(r.current);
             r.current = null;
             r.step = Step.OPEN;
             paced(r, now);
@@ -533,6 +543,7 @@ public final class BackgroundJobs {
         AbstractContainerMenu menu = BackgroundAccess.hiddenMenu(mc);
         if (menu != null && r.current != null) ContainerRecorder.recordHidden(mc, r.current, menu);
         BackgroundAccess.closeHidden(mc);
+        if (r.current != null) ContainerWatch.ours(r.current);
         r.current = null;
         r.step = Step.OPEN;
         paced(r, now);
@@ -582,6 +593,7 @@ public final class BackgroundJobs {
      */
     private static void stop(Minecraft mc, Running r, @Nullable String message) {
         BackgroundAccess.abandon(mc);
+        if (r.current != null) ContainerWatch.ours(r.current);
         running = null;
         QUEUE.clear();
         // The server closed the table for the first container; its screen is dead, so open the table again.

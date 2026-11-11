@@ -72,7 +72,7 @@ public final class StackScan {
         if (opened == null) return;
         List<MemoryEntry> others = stackedWith(mc.player, opened);
         CraftySearch.LOGGER.debug("Reading {} carts stacked with {}", others.size(), cart);
-        if (!others.isEmpty()) BackgroundJobs.submitAutomatic(mc, new ScanJob(others));
+        if (!others.isEmpty()) BackgroundJobs.submitAutomatic(mc, new ScanJob(others, "craftysearch.background.scanning"));
     }
 
     /** The rest of the opened cart's stack, of included kinds and within reach. */
