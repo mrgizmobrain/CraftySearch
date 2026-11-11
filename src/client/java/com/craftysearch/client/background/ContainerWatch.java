@@ -35,8 +35,9 @@ import java.util.Set;
  *
  * <p>Telling this player's own lid events from someone else's (Nov 11): each of this player's
  * openings accounts for exactly one event where the count goes up and, after closing, one
- * where it goes down ({@link Visits}). Every other event is someone else's, also one that
- * only says a lid closed (its opening may have happened before this player came near).
+ * where it goes down ({@link Visits}). Every other change of the count is someone else's.
+ * The server repeats the count every 5 ticks while a container is open, so one opened before
+ * this player came near is heard about too; repeats that change nothing are ignored.
  */
 public final class ContainerWatch {
     /** A visit whose own closing event never came (a refused click, lag) is forgotten after this long. */
@@ -139,8 +140,11 @@ public final class ContainerWatch {
 
         Visits visits = VISITS.get(at);
         if (visits == null) {
-            // Not this player's: someone opened it, or closed it after an opening that went unseen.
-            mark(mc, at);
+            // Not this player's: someone has it open, or just closed it. The server sends the count again
+            // every 5 ticks while a container is open and once more after the last closing
+            // (ContainerOpenersCounter.recheckOpeners), so a 0 after a 0 is only that repeat: it follows this
+            // player's own visits too (Nov 11: taking it for someone else marked everything they opened).
+            if (openers > 0 || before > 0) mark(mc, at);
         } else if (openers > before) {
             if (visits.risesPending > 0) {
                 visits.risesPending--;
