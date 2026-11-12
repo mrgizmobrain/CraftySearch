@@ -9,7 +9,8 @@ What to fill in on each site. The icon is `src/main/resources/assets/craftysearc
 | Name | Crafty Search |
 | Summary | Search, count, take and craft from your nearby storage, right from the inventory. Works on any server. |
 | License | MIT |
-| Source / Issues | https://github.com/mrgizmobrain/CraftySearch, https://github.com/mrgizmobrain/CraftySearch/issues |
+| Source | https://github.com/mrgizmobrain/CraftySearch |
+| Issues | https://github.com/mrgizmobrain/CraftySearch/issues |
 | Loader | Fabric |
 | Game version | 26.2 |
 | Java | 25 |
@@ -21,9 +22,7 @@ What to fill in on each site. The icon is `src/main/resources/assets/craftysearc
 
 ## Description
 
-Paste everything below this line.
-
----
+Copy from "**Crafty Search** lets you..." down to the end of the file.
 
 **Crafty Search** lets you search, count, take and craft from the items in your nearby storage, straight from the inventory and the crafting table, without opening chests one by one.
 
@@ -50,10 +49,21 @@ On a server with the mod, it respects claims (Open Parties and Claims, Flan, and
 
 ### On servers without the mod
 
-In client-only mode the server sees ordinary container clicks, made for you in the background. **Check a server's rules before using it there.** The "Anti-cheat safe" setting (on by default) keeps everything at a careful pace with the riskier options off, and "All interactions" off turns every click off while still remembering what you open and showing where things are.
+In client-only mode the server sees ordinary container clicks, made for you in the background. **Check a server's rules before using it there.**
 
-On a shared server the panel marks containers someone else has opened with an orange corner, and Shift-clicking the sort button checks every container within reach.
+- **Anti-cheat safe** (on by default) keeps everything at a careful pace, with the riskier options off.
+- **All interactions** off stops every click, while still remembering what you open and showing where things are.
+- On a shared server, containers someone else has opened get an orange corner on their tiles.
+- Shift-click the sort button to check every container within reach at once.
 
 ### Works with
 
-Mod Menu, JEI, REI, Mouse Tweaks, Inventory Profiles Next, and Iris shader packs.
+Made to work with these:
+
+- **Mod Menu:** opens the settings.
+- **JEI and REI:** their item lists keep clear of the panel.
+- **Mouse Tweaks:** its scrolling and dragging work alongside the panel's.
+- **Inventory Profiles Next:** locked slots are never put away or filled.
+- **Iris shader packs:** highlights show as markers on screen.
+
+It should get along with most other mods too. If one doesn't, please open an issue.
