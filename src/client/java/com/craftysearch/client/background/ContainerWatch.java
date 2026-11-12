@@ -10,6 +10,9 @@ import com.craftysearch.client.storage.StorageIndex;
 import com.craftysearch.storage.ContainerKey;
 import com.craftysearch.storage.ContainerKind;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -35,17 +38,16 @@ import java.util.Set;
  *
  * <p>Telling this player's own lid events from someone else's (Nov 11): each of this player's
  * openings accounts for exactly one event where the count goes up and, after closing, one
- * where it goes down ({@link Visits}). Every other change of the count is someone else's.
- * The server repeats the count every 5 ticks while a container is open, so one opened before
- * this player came near is heard about too; repeats that change nothing are ignored.
+ * where it goes down ({@link Visits}). The rest of the count is other people. The server
+ * repeats the count every 5 ticks while a container is open, so one opened before this player
+ * came near is heard about too; repeats that change nothing are ignored.
  *
- * <p>Two players with the mod and "Recheck used" (Nov 11): each one's background read is
- * someone else's visit to the other, so they read the same containers back and forth for as
- * long as they stood there. A read can't be told from a take by its lid events, so each
- * visit by someone else is judged when it ends: a short one (under a second, the length of a
- * background job) that comes within seconds of this player's own recheck finding nothing
- * changed is most likely the other player's recheck of that read, an "echo". It still marks
- * the container, but doesn't get it read again; any other visit does.
+ * <p>Other players with the mod (Nov 11): their background reads are visits too, so with
+ * "Recheck used" two players read the same containers back and forth. A read can't be told
+ * from a take by its lid events, but a visit by someone else to a container this player was in
+ * moments ago is most likely their mod reading what this player just did. Such a visit isn't
+ * marked at once: if it's over within a second (and the visitor's ping), nothing changed and
+ * it's let go; if it lasts longer, it's marked like any other.
  */
 public final class ContainerWatch {
     /** A visit whose own closing event never came (a refused click, lag) is forgotten after this long. */
@@ -63,12 +65,14 @@ public final class ContainerWatch {
     private static final int BARREL_RADIUS = 48;
     /** Lid events reach players within 64 blocks; a little less, so a count is dropped before it can go stale. */
     private static final double HEARING_DISTANCE = 56;
-    /** A visit by someone else shorter than this is a background job's length: a read, or a quick take. */
-    private static final long SHORT_VISIT_MILLIS = 1000;
-    /** A short visit this soon after this player's recheck found nothing changed is taken for an echo of that read. */
-    private static final long ECHO_WINDOW_MILLIS = 10_000;
-    /** What's known about a block's visits is dropped after this long. */
-    private static final long FORGET_MILLIS = 10 * 60_000;
+    /** A visit by someone else that begins this soon after this player was in the container may be their mod reading it. */
+    private static final long ECHO_WINDOW_MILLIS = 5000;
+    /** Such a visit over within this long, plus the visitor's ping, was a background read: a person takes longer. */
+    private static final long READ_MILLIS = 1000;
+    /** Players this close to a container may be the one in it. */
+    private static final double VISITOR_DISTANCE = 8;
+    /** A barrel is looked at every half second, so its visits are timed to that. */
+    private static final long BARREL_LOOK_MILLIS = BARREL_INTERVAL_TICKS * 50L;
 
     /**
      * This player's openings of one container, by hand or in the background, until their own
@@ -92,19 +96,12 @@ public final class ContainerWatch {
     /** Used by someone else while this player was inside too; marked once this player is out, since each reading clears the mark. */
     private static final Set<BlockPos> USED = new HashSet<>();
     private static final Map<ContainerKey, Long> RECHECKED_AT = new HashMap<>();
-    /** When someone else's visit to a chest or shulker box began, while it lasts. */
-    private static final Map<BlockPos, Long> OPENED_AT = new HashMap<>();
-    /** How many looks in a row found a barrel open with this player not inside: one is a short visit. */
-    private static final Map<BlockPos, Integer> BARREL_SEEN = new HashMap<>();
-    /** When someone else's last visit that should be read again ended, and the last echo. */
-    private static final Map<BlockPos, Long> REAL_AT = new HashMap<>();
-    private static final Map<BlockPos, Long> ECHO_AT = new HashMap<>();
-    /** When this player's last recheck of the container found nothing changed. */
-    private static final Map<BlockPos, Long> QUIET_AT = new HashMap<>();
-    /** A recheck asked for, with what was remembered then, until a reading shows whether anything changed. */
-    private record Pending(MemoryEntry before, long at) {
-    }
-    private static final Map<ContainerKey, Pending> PENDING = new HashMap<>();
+    /** When this player last closed the container at each block. */
+    private static final Map<BlockPos, Long> OURS_AT = new HashMap<>();
+    /** When the visit by someone else that's going on now began. */
+    private static final Map<BlockPos, Long> OTHERS_SINCE = new HashMap<>();
+    /** Visits by someone else not marked yet, as they may be a read: decided when they end, or once too long for one. */
+    private static final Set<BlockPos> HELD = new HashSet<>();
     private static @Nullable Level level;
     private static int ticks;
 
@@ -151,8 +148,10 @@ public final class ContainerWatch {
         visits.inside = false;
         visits.closedAt = now;
         visits.dropsPending++;
-        // Whoever else is inside now can change it after this player's last look.
-        if (OPENERS.getOrDefault(pos, 0) - visits.counted > 0) USED.add(pos);
+        OURS_AT.put(pos, now);
+        // Whoever else is inside now can change it after this player's last look. Someone who came in
+        // during this visit is still held back: if it's a read, it's let go when it ends.
+        if (OPENERS.getOrDefault(pos, 0) - visits.counted > 0 && !HELD.contains(pos)) USED.add(pos);
     }
 
     /** A block event from the server: type 1 on a chest or shulker box is its lid, with how many have it open. */
@@ -161,47 +160,88 @@ public final class ContainerWatch {
         ContainerKind kind = ContainerKind.of(mc.level.getBlockState(pos));
         if (kind != ContainerKind.CHEST && kind != ContainerKind.SHULKER_BOX) return;
         BlockPos at = pos.immutable();
-        long now = System.currentTimeMillis();
         int before = OPENERS.getOrDefault(at, 0);
+        // The server sends the count again every 5 ticks while a container is open and once more after the
+        // last closing (ContainerOpenersCounter.recheckOpeners). A repeat says nothing new (Nov 11: taking the
+        // one after this player's own closing for someone else marked everything they opened).
+        if (openers == before) return;
         if (openers > 0) OPENERS.put(at, openers);
         else OPENERS.remove(at);
-        Long openedAt = openers == 0 ? OPENED_AT.remove(at) : null;
 
         Visits visits = VISITS.get(at);
-        if (visits == null) {
-            // Not this player's: someone has it open, or just closed it. The server sends the count again
-            // every 5 ticks while a container is open and once more after the last closing
-            // (ContainerOpenersCounter.recheckOpeners), so a 0 after a 0 is only that repeat: it follows this
-            // player's own visits too (Nov 11: taking it for someone else marked everything they opened).
-            if (openers > 0 && before == 0) OPENED_AT.putIfAbsent(at, now);
-            if (openers > 0 || before > 0) mark(mc, at);
-            // The last one closed it: a visit of unknown length (opened before this player came near) isn't short.
-            if (openers == 0 && before > 0) visitEnded(at, openedAt != null && now - openedAt < SHORT_VISIT_MILLIS, now);
-        } else if (openers > before) {
-            if (visits.risesPending > 0) {
+        int mineBefore = visits == null ? 0 : visits.counted;
+        if (visits != null) {
+            if (openers > before && visits.risesPending > 0) {
                 visits.risesPending--;
                 visits.counted++;
-            } else if (!(visits.inside && visits.byHand)) {
-                // Someone else opened it too. (With its screen up their changes show, and closing reads it.)
-                USED.add(at);
+            } else if (openers < before && visits.dropsPending > 0 && visits.counted > 0) {
+                visits.dropsPending--;
+                visits.counted--;
             }
-        } else if (openers < before && visits.dropsPending > 0 && visits.counted > 0) {
-            visits.dropsPending--;
-            visits.counted--;
             // This player's last closing is in: from here on every event is someone else's.
             if (!visits.inside && visits.risesPending == 0 && visits.dropsPending == 0) VISITS.remove(at);
         }
+        int mineAfter = visits == null ? 0 : visits.counted;
+        boolean othersBefore = before - mineBefore > 0;
+        boolean othersNow = openers - mineAfter > 0;
+        long now = System.currentTimeMillis();
+        if (othersNow && !othersBefore) othersArrived(mc, at, now);
+        else if (!othersNow && othersBefore) othersLeft(mc, at, now);
+    }
+
+    /** Someone else is in the container at {@code pos} now, since {@code since}, where nobody else was. */
+    private static void othersArrived(Minecraft mc, BlockPos pos, long since) {
+        OTHERS_SINCE.put(pos, since);
+        // Right after this player's own visit it may be another player's mod reading it: wait and see.
+        if (justVisited(pos, since)) HELD.add(pos);
+        else mark(mc, pos);
+    }
+
+    /** Everyone else has left the container at {@code pos}. */
+    private static void othersLeft(Minecraft mc, BlockPos pos, long now) {
+        Long since = OTHERS_SINCE.remove(pos);
+        // Not held back: it was marked when it began.
+        if (!HELD.remove(pos)) return;
+        // Over this soon, it was a background read: nothing changed, so there's nothing to mark or read again.
+        if (since != null && now - since < readLimit(mc, pos)) return;
+        used(pos);
+    }
+
+    /** This player is in the container at {@code pos}, or was moments before {@code at}. */
+    private static boolean justVisited(BlockPos pos, long at) {
+        Visits visits = VISITS.get(pos);
+        if (visits != null && visits.inside) return true;
+        Long ours = OURS_AT.get(pos);
+        return ours != null && at - ours < ECHO_WINDOW_MILLIS;
+    }
+
+    /**
+     * The longest a background read by someone at {@code pos} takes: about one round trip to the
+     * server, so a second plus the ping (the tab list's) of the slowest player near it.
+     */
+    private static long readLimit(Minecraft mc, BlockPos pos) {
+        int ping = 0;
+        ClientPacketListener connection = mc.getConnection();
+        if (connection != null && mc.level != null) {
+            for (AbstractClientPlayer other : mc.level.players()) {
+                if (other == mc.player || !other.blockPosition().closerThan(pos, VISITOR_DISTANCE)) continue;
+                PlayerInfo info = connection.getPlayerInfo(other.getUUID());
+                if (info != null) ping = Math.max(ping, info.getLatency());
+            }
+        }
+        return READ_MILLIS + ping;
+    }
+
+    /** Someone else's visit changed it, as far as anyone can tell: marked once this player is out. */
+    private static void used(BlockPos pos) {
+        Visits visits = VISITS.get(pos);
+        // With its screen up, their changes showed as they happened, and closing records them.
+        if (visits != null && visits.inside && visits.byHand) return;
+        USED.add(pos);
     }
 
     private static void mark(Minecraft mc, BlockPos pos) {
         ContainerMemory.get().markSuspect(mc.level.dimension(), pos);
-    }
-
-    /** Someone else's visit to the container at {@code pos} is over: an echo of this player's own read, or one to read again. */
-    private static void visitEnded(BlockPos pos, boolean shortVisit, long now) {
-        Long quiet = QUIET_AT.get(pos);
-        boolean echo = shortVisit && quiet != null && now - quiet < ECHO_WINDOW_MILLIS;
-        (echo ? ECHO_AT : REAL_AT).put(pos, now);
     }
 
     static void tick(Minecraft mc) {
@@ -218,19 +258,14 @@ public final class ContainerWatch {
                 Visits visits = VISITS.get(pos);
                 if (visits != null && visits.inside) return false;
                 mark(mc, pos);
-                // Overlapping this player's own visit, its length is unknown: read it again.
-                REAL_AT.put(pos, now);
                 return true;
             });
         }
-        // Every tick: the other player's echo of a read can come back within half a second.
-        resolvePending(mc, now);
         if (ticks % JUDGE_INTERVAL_TICKS == 0) judge(mc, now);
-        // Barrels first: a barrel found closed this tick is judged before the recheck looks at it.
         if (ticks % BARREL_INTERVAL_TICKS == 0) watchBarrels(mc, now);
         if (ticks % RECHECK_INTERVAL_TICKS == 0) {
             recheck(mc, now);
-            forgetOld(now);
+            OURS_AT.values().removeIf(at -> now - at > ECHO_WINDOW_MILLIS);
         }
     }
 
@@ -243,41 +278,42 @@ public final class ContainerWatch {
             }
             if (!visits.inside && now - visits.closedAt > VISIT_TIMEOUT_MILLIS) VISITS.remove(e.getKey());
         }
+        // Held back for longer than a read takes (or its end went unheard): someone is using it.
+        for (BlockPos pos : List.copyOf(HELD)) {
+            Long since = OTHERS_SINCE.get(pos);
+            if (since != null && now - since < readLimit(mc, pos)) continue;
+            HELD.remove(pos);
+            used(pos);
+        }
         if (OPENERS.isEmpty()) return;
         BlockPos at = mc.player.blockPosition();
         for (BlockPos pos : List.copyOf(OPENERS.keySet())) {
-            // A lid open with no visit of this player's is someone else's.
-            if (!VISITS.containsKey(pos)) mark(mc, pos);
+            // A lid open with no visit of this player's, and not held back, is someone else's.
+            if (!VISITS.containsKey(pos) && !HELD.contains(pos)) mark(mc, pos);
             // The server only tells players nearby about lids, so further off the closing would go unheard.
             if (!mc.level.isLoaded(pos) || !pos.closerThan(at, HEARING_DISTANCE)) {
                 OPENERS.remove(pos);
-                OPENED_AT.remove(pos);
+                OTHERS_SINCE.remove(pos);
             }
         }
     }
 
     /**
      * A barrel has no lid event, only its open state, which doesn't say how many have it open.
-     * It's looked at twice a second, so a background read is often missed altogether; one seen
-     * open at a single look was a short visit.
+     * It's looked at twice a second, so a background read is often missed altogether.
      */
     private static void watchBarrels(Minecraft mc, long now) {
         BlockPos center = mc.player.blockPosition();
         for (MemoryEntry entry : ContainerMemory.get().entries(mc.level.dimension())) {
             if (entry.kind() != ContainerKind.BARREL || !entry.isWithin(mc.level, center, BARREL_RADIUS)) continue;
             BlockPos pos = entry.pos();
-            if (!barrelOpen(mc, pos)) {
-                Integer seen = BARREL_SEEN.remove(pos);
-                if (seen != null) visitEnded(pos, seen < 2, now);
-                continue;
-            }
             Visits visits = VISITS.get(pos);
-            if (visits != null && (visits.inside || now - visits.closedAt < BARREL_GRACE_MILLIS)) {
-                BARREL_SEEN.remove(pos);
-                continue;
-            }
-            BARREL_SEEN.merge(pos, 1, Integer::sum);
-            mark(mc, pos);
+            boolean mine = visits != null && (visits.inside || now - visits.closedAt < BARREL_GRACE_MILLIS);
+            boolean others = barrelOpen(mc, pos) && !mine;
+            boolean othersBefore = OTHERS_SINCE.containsKey(pos);
+            // It opened some time since the last look: halfway is the best guess.
+            if (others && !othersBefore) othersArrived(mc, pos, now - BARREL_LOOK_MILLIS / 2);
+            else if (!others && othersBefore) othersLeft(mc, pos, now);
         }
     }
 
@@ -301,7 +337,7 @@ public final class ContainerWatch {
         List<MemoryEntry> due = new ArrayList<>();
         for (MemoryEntry entry : StorageIndex.nearbyEntries(mc)) {
             if (!entry.suspect() || entry.isEntity() || !RecipeStorage.isReachable(player, entry)) continue;
-            if (usedNow(mc, entry) || onlyEchoes(entry)) continue;
+            if (usedNow(mc, entry)) continue;
             Long last = RECHECKED_AT.get(entry.key());
             if (last != null) {
                 // Read since the last try, so this is a new use: no need to hold off as after a failed try
@@ -310,55 +346,9 @@ public final class ContainerWatch {
                 if (now - last < (readSince ? RECHECK_GAP_MILLIS : RETRY_MILLIS)) continue;
             }
             RECHECKED_AT.put(entry.key(), now);
-            PENDING.put(entry.key(), new Pending(entry, now));
             due.add(entry);
         }
         if (!due.isEmpty()) BackgroundJobs.submitAutomatic(mc, new ScanJob(due, "craftysearch.background.rechecking"));
-    }
-
-    /**
-     * True when every visit by others since the container was last read was an echo of this
-     * player's own read: it stays marked, but isn't read again (the read would only be echoed
-     * back). A container marked before this session, or by a visit that went unjudged, has no
-     * echo and is read as before.
-     */
-    private static boolean onlyEchoes(MemoryEntry entry) {
-        long seen = entry.lastSeenMillis();
-        return after(ECHO_AT, entry, seen) && !after(REAL_AT, entry, seen);
-    }
-
-    private static boolean after(Map<BlockPos, Long> times, MemoryEntry entry, long since) {
-        Long at = times.get(entry.pos());
-        if (at != null && at > since) return true;
-        Long other = entry.other() == null ? null : times.get(entry.other());
-        return other != null && other > since;
-    }
-
-    /** Learns from each recheck whether it found anything changed, once the container has been read. */
-    private static void resolvePending(Minecraft mc, long now) {
-        if (PENDING.isEmpty()) return;
-        PENDING.entrySet().removeIf(e -> {
-            Pending pending = e.getValue();
-            MemoryEntry current = ContainerMemory.get().entry(mc.level.dimension(), e.getKey());
-            if (current == null) return true;
-            if (current.lastSeenMillis() < pending.at()) return now - pending.at() > RETRY_MILLIS;
-            boolean unchanged = current.counts().equals(pending.before().counts());
-            quiet(current.pos(), unchanged, current.lastSeenMillis());
-            if (current.other() != null) quiet(current.other(), unchanged, current.lastSeenMillis());
-            return true;
-        });
-    }
-
-    private static void quiet(BlockPos pos, boolean unchanged, long readAt) {
-        if (unchanged) QUIET_AT.put(pos, readAt);
-        else QUIET_AT.remove(pos);
-    }
-
-    private static void forgetOld(long now) {
-        REAL_AT.values().removeIf(at -> now - at > FORGET_MILLIS);
-        ECHO_AT.values().removeIf(at -> now - at > FORGET_MILLIS);
-        QUIET_AT.values().removeIf(at -> now - at > FORGET_MILLIS);
-        OPENED_AT.values().removeIf(at -> now - at > FORGET_MILLIS);
     }
 
     /** Someone still has it open: reading it now would only catch them halfway. */
@@ -372,12 +362,9 @@ public final class ContainerWatch {
         VISITS.clear();
         USED.clear();
         RECHECKED_AT.clear();
-        OPENED_AT.clear();
-        BARREL_SEEN.clear();
-        REAL_AT.clear();
-        ECHO_AT.clear();
-        QUIET_AT.clear();
-        PENDING.clear();
+        OURS_AT.clear();
+        OTHERS_SINCE.clear();
+        HELD.clear();
         level = null;
     }
 }
