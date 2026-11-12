@@ -13,6 +13,7 @@
     "issues": "https://github.com/mrgizmobrain/CraftySearch/issues"
   },
   "license": "MIT",
+  "icon": "assets/craftysearch/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [

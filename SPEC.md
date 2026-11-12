@@ -381,7 +381,7 @@ The user confirmed all of that worked, then (Nov 9):
 - Considered and left out: re-reading everything in reach whenever the panel opens (a wall of chests would all open each time).
 
 ## 9. Open questions / later
-- Before a release: an icon, a dedicated-server test, and the Modrinth and CurseForge listings.
+- Before a release: the Modrinth and CurseForge listings (Nov 12: icon drawn by `tools/Icon.java`, version 1.0.0, `CHANGELOG.md`, listing text in `docs/listing.md`; the dedicated-server test passed Nov 9).
 - Ender chests: decided against (Nov 8). The user prefers them without the mod; each player's ender chest is one inventory behind every ender chest block, so it would need its own handling in every part.
 - EMI, once it has a 26.2 build: the same exclusion zone as JEI and REI (`EmiExclusionArea`).
 - Deeper recipe viewer integration: the viewers' "+" (recipe transfer) pulling from storage, viewers counting storage as available, locating an item from the viewer. The user chose only "keep clear of the panel" for now (Nov 8).
