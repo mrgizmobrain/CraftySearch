@@ -21,14 +21,16 @@ import net.minecraft.network.chat.Component;
 final class PanelSortButton extends AbstractButton {
     static final int SIZE = 14;
     private static final int LABEL_COLOR = 0xFF404040;
-    /** The check's icon, drawn pixel by pixel to fill the button's 10 by 10 face (a ↻ glyph came out tiny). */
+    /**
+     * The check's icon, drawn pixel by pixel to fill the button's 10 by 10 face (a ↻ glyph came
+     * out tiny). Nine rows, leaving one free above the bottom edge (ten touched it).
+     */
     private static final String[] CHECK_ICON = {
             ".....#..",
             ".....##.",
             "..######",
             ".#...##.",
             "#....#..",
-            "#.......",
             "#......#",
             "#......#",
             ".#....#.",
