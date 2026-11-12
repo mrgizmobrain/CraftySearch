@@ -148,7 +148,8 @@ public final class ContainerMemory {
         ContainerKey key = dim == null ? null : dim.index.get(pos);
         MemoryEntry entry = key == null ? null : dim.entries.get(key);
         if (entry == null || entry.suspect()) return false;
-        dim.put(entry.asSuspect());
+        // In place: callers may be looping over the entries (Nov 11: a barrel marked that way crashed the game).
+        dim.replace(entry.asSuspect());
         changed(dim);
         return true;
     }
@@ -442,6 +443,12 @@ public final class ContainerMemory {
             entries.put(key, entry);
             index.put(entry.pos(), key);
             if (entry.other() != null) index.put(entry.other(), key);
+        }
+
+        /** The same container (same key and blocks) with new details, replaced without removing it, so a loop over the entries can go on. */
+        void replace(MemoryEntry entry) {
+            encoded.remove(entry.key());
+            entries.put(entry.key(), entry);
         }
 
         void removeAt(BlockPos pos) {

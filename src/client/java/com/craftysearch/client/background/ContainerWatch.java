@@ -304,7 +304,8 @@ public final class ContainerWatch {
      */
     private static void watchBarrels(Minecraft mc, long now) {
         BlockPos center = mc.player.blockPosition();
-        for (MemoryEntry entry : ContainerMemory.get().entries(mc.level.dimension())) {
+        // A copy: marking a barrel changes the memory this loops over.
+        for (MemoryEntry entry : List.copyOf(ContainerMemory.get().entries(mc.level.dimension()))) {
             if (entry.kind() != ContainerKind.BARREL || !entry.isWithin(mc.level, center, BARREL_RADIUS)) continue;
             BlockPos pos = entry.pos();
             Visits visits = VISITS.get(pos);
