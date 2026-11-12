@@ -69,6 +69,14 @@ abstract class BackgroundJob {
     }
 
     /**
+     * True for a job that only reads (Nov 11): a container that doesn't open, or opens
+     * something else, is left out and the job goes on, instead of stopping it.
+     */
+    boolean skipsFailures() {
+        return false;
+    }
+
+    /**
      * For an automatic job stepping aside for the player: a job for the containers from
      * {@code next} on, to run later, or null if there's nothing left.
      */

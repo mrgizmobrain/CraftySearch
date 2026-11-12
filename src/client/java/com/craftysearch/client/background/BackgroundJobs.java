@@ -92,7 +92,8 @@ public final class BackgroundJobs {
         }
     }
 
-    private enum Step { PREPARE, OPEN, WAIT_OPEN, WORK, CLOSE, REOPEN, WAIT_REOPEN, FINISH }
+    /** SKIP: a container that didn't open is left out, until a late answer to it can't be taken for the next one's. */
+    private enum Step { PREPARE, OPEN, WAIT_OPEN, SKIP, WORK, CLOSE, REOPEN, WAIT_REOPEN, FINISH }
 
     private static final class Running {
         final BackgroundJob job;
@@ -223,6 +224,16 @@ public final class BackgroundJobs {
     static boolean hasOpen(BlockPos pos) {
         Running r = running;
         return r != null && r.current != null && !r.current.isEntity() && r.current.contains(pos);
+    }
+
+    /** True while a check of everything in reach (Nov 11) runs or waits, so another press adds nothing. */
+    static boolean checkingAll() {
+        Running r = running;
+        if (r != null && r.job instanceof ScanJob scan && !scan.automatic()) return true;
+        for (Request request : QUEUE) {
+            if (request instanceof StorageActions.CheckAll) return true;
+        }
+        return false;
     }
 
     /** True while a job runs or waits in the queue: new requests should be queued too. */
@@ -443,6 +454,12 @@ public final class BackgroundJobs {
             case PREPARE -> prepare(mc, r, now);
             case OPEN -> openNext(mc, r, now);
             case WAIT_OPEN -> waitOpen(mc, r, now);
+            case SKIP -> {
+                // The late answer came (and was closed unseen), or can't anymore.
+                if (BackgroundAccess.isWaiting() && now <= r.waitUntil) return;
+                r.step = Step.OPEN;
+                paced(r, now);
+            }
             case WORK -> work(mc, r, now);
             case CLOSE -> closeCurrent(mc, r, now);
             case REOPEN -> {
@@ -503,11 +520,14 @@ public final class BackgroundJobs {
         AbstractContainerMenu menu = r.job.automatic() ? BackgroundAccess.openedMenu() : BackgroundAccess.hiddenMenu(mc);
         // State id 0: the contents haven't arrived yet.
         if (menu == null || menu.getStateId() == 0) {
-            if (now > r.waitUntil) stop(mc, r, "craftysearch.background.no_open");
+            if (now <= r.waitUntil) return;
+            if (r.job.skipsFailures()) skip(mc, r, now);
+            else stop(mc, r, "craftysearch.background.no_open");
             return;
         }
         if (!ContainerRecorder.recordHidden(mc, r.current, menu)) {
-            stop(mc, r, "craftysearch.background.unexpected");
+            if (r.job.skipsFailures()) skip(mc, r, now);
+            else stop(mc, r, "craftysearch.background.unexpected");
             return;
         }
         if (r.job.automatic()) {
@@ -522,6 +542,20 @@ public final class BackgroundJobs {
             return;
         }
         r.step = Step.WORK;
+    }
+
+    /**
+     * A job that only reads leaves out a container that doesn't open (a block on a chest, a
+     * claim, a lock) or opens something else, and goes on (Nov 11): one such container
+     * shouldn't end a check of everything in reach. An answer still on its way is closed
+     * unseen, and the next container opens only once it has come or can't anymore.
+     */
+    private static void skip(Minecraft mc, Running r, long now) {
+        BackgroundAccess.giveUp(mc, now + TIMEOUT_MILLIS);
+        if (r.current != null) ContainerWatch.closed(r.current);
+        r.current = null;
+        r.step = Step.SKIP;
+        r.waitUntil = now + TIMEOUT_MILLIS;
     }
 
     private static void work(Minecraft mc, Running r, long now) {

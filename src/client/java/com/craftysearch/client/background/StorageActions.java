@@ -13,11 +13,13 @@ import com.craftysearch.client.storage.StorageIndex.ItemTotal;
 import com.craftysearch.network.OpenContainerPayload;
 import com.craftysearch.network.PutAwayPayload;
 import com.craftysearch.network.TakePayload;
+import com.craftysearch.storage.ContainerKey;
 import com.craftysearch.storage.ContainerKind;
 import com.craftysearch.storage.ItemKey;
 import com.craftysearch.storage.PutAwayMatch;
 import com.craftysearch.storage.PutAwayRule;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
@@ -25,10 +27,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,6 +50,8 @@ public final class StorageActions {
     /** Main-inventory slot numbers, the three rows above the hotbar first. */
     private static final int[] MAIN_ROWS_FIRST = IntStream.concat(
             IntStream.range(Inventory.SELECTION_SIZE, Inventory.INVENTORY_SIZE), IntStream.range(0, Inventory.SELECTION_SIZE)).toArray();
+    /** How far around the eyes a check of everything in reach looks for containers; reach itself is a little less. */
+    private static final int CHECK_SEARCH_BLOCKS = 7;
     /** A stack just sent off by Ctrl+scroll isn't picked again while the server or a job is still moving it. */
     private static final long STACK_RESEND_MILLIS = 1000;
     private static final long[] STACK_SENT_AT = new long[Inventory.INVENTORY_SIZE];
@@ -292,6 +300,93 @@ public final class StorageActions {
         } else {
             BackgroundAccess.useBlock(mc, target.pos());
         }
+    }
+
+    /** Whether a shift-click on the panel's sort button can check every container within reach: client-only mode, allowed to act. */
+    public static boolean canCheckAll() {
+        return !ServerMode.active() && ClientConfig.get().actsClientOnly();
+    }
+
+    /**
+     * Shift-click on the panel's sort button (Nov 11, client-only): reads every container within
+     * reach, remembered or not, nearest first. The panel then catches up with what went on unseen
+     * (carts, hoppers and automation give no sign of use at all), and a new place is learned in
+     * one go. One that doesn't open is left out; another press while it runs adds nothing.
+     */
+    public static void checkAll(Minecraft mc) {
+        if (mc.player == null || !canCheckAll() || BackgroundJobs.checkingAll()) return;
+        BackgroundJobs.submit(mc, new CheckAll());
+    }
+
+    /** A queued check of everything in reach, planned when its turn comes. */
+    static final class CheckAll implements BackgroundJobs.Request {
+        @Override
+        public @Nullable BackgroundJob create(Minecraft mc) {
+            List<MemoryEntry> targets = containersInReach(mc);
+            if (targets.isEmpty()) {
+                if (mc.player != null) mc.player.sendOverlayMessage(Component.translatable("craftysearch.storage.none_to_check"));
+                return null;
+            }
+            return ScanJob.checkingAll(targets);
+        }
+    }
+
+    /**
+     * The containers of the included kinds within reach, nearest first: the remembered ones, and
+     * blocks, carts and boats not remembered yet. Chests that can't open (a block on top, a cat
+     * on the lid) are left out rather than tried.
+     */
+    private static List<MemoryEntry> containersInReach(Minecraft mc) {
+        LocalPlayer player = mc.player;
+        Level level = mc.level;
+        if (player == null || level == null) return List.of();
+        ClientConfig config = ClientConfig.get();
+        Map<ContainerKey, MemoryEntry> found = new LinkedHashMap<>();
+        Set<BlockPos> covered = new HashSet<>();
+        for (MemoryEntry entry : StorageIndex.nearbyEntries(mc)) {
+            if (!entry.isEntity()) {
+                covered.add(entry.pos());
+                if (entry.other() != null) covered.add(entry.other());
+            }
+            if (RecipeStorage.isReachable(player, entry) && !chestBlocked(level, entry.kind(), entry.pos(), entry.other())) {
+                found.put(entry.key(), entry);
+            }
+        }
+        // Whether each is within reach is up to RecipeStorage; this only bounds the search.
+        BlockPos eyes = BlockPos.containing(player.getEyePosition());
+        BlockPos from = eyes.offset(-CHECK_SEARCH_BLOCKS, -CHECK_SEARCH_BLOCKS, -CHECK_SEARCH_BLOCKS);
+        BlockPos to = eyes.offset(CHECK_SEARCH_BLOCKS, CHECK_SEARCH_BLOCKS, CHECK_SEARCH_BLOCKS);
+        for (BlockPos p : BlockPos.betweenClosed(from, to)) {
+            if (covered.contains(p)) continue;
+            BlockState state = level.getBlockState(p);
+            ContainerKind kind = ContainerKind.of(state);
+            if (kind == null || !config.includes(kind)) continue;
+            BlockPos pos = p.immutable();
+            BlockPos other = ContainerKind.otherHalf(pos, state);
+            covered.add(pos);
+            if (other != null) covered.add(other);
+            // A double chest is clicked on a half within reach.
+            BlockPos click = RecipeStorage.canReach(player, pos) ? pos
+                    : other != null && RecipeStorage.canReach(player, other) ? other : null;
+            if (click == null || chestBlocked(level, kind, pos, other)) continue;
+            BlockPos second = click == pos ? other : pos;
+            found.put(ContainerKey.ofBlock(click), new MemoryEntry(click, second, null, kind, 0, new Object2IntOpenHashMap<>()));
+        }
+        for (Entity entity : level.getEntities((Entity) null, player.getBoundingBox().inflate(CHECK_SEARCH_BLOCKS),
+                e -> ContainerKind.of(e) != null)) {
+            ContainerKind kind = ContainerKind.of(entity);
+            ContainerKey key = ContainerKey.ofEntity(entity.getUUID());
+            if (kind == null || !config.includes(kind) || found.containsKey(key) || !RecipeStorage.canReach(player, entity)) continue;
+            found.put(key, new MemoryEntry(entity.blockPosition(), null, entity.getUUID(), kind, 0, new Object2IntOpenHashMap<>()));
+        }
+        BlockPos at = player.blockPosition();
+        return found.values().stream().sorted(Comparator.comparingDouble(e -> e.distanceSqr(level, at))).toList();
+    }
+
+    /** A chest that can't open now: a solid block, or a cat, on either half's lid. */
+    private static boolean chestBlocked(Level level, ContainerKind kind, BlockPos pos, @Nullable BlockPos other) {
+        if (kind != ContainerKind.CHEST) return false;
+        return ChestBlock.isChestBlockedAt(level, pos) || (other != null && ChestBlock.isChestBlockedAt(level, other));
     }
 
     /**

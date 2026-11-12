@@ -177,6 +177,16 @@ public final class BackgroundAccess {
         }
     }
 
+    /**
+     * Moves on from the current container (a job that only reads, Nov 11): closes it if it's
+     * open, and an answer still on its way is closed unseen until {@code until}.
+     */
+    static void giveUp(Minecraft mc, long until) {
+        Expected e = expected;
+        closeHidden(mc);
+        if (e != null) expected = new Expected(until, -1, true, e.type());
+    }
+
     static void reset() {
         expected = null;
         hidden = null;

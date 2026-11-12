@@ -17,6 +17,8 @@
   "craftysearch.panel.sort.count": "Sort: most first",
   "craftysearch.panel.sort.name": "Sort: by name",
   "craftysearch.panel.sort.mod": "Sort: by mod",
+  "craftysearch.panel.sort.check_all_hint": "Shift-click: check every container within reach",
+  "craftysearch.panel.check_all": "Check every container within reach, even ones you haven't opened.\nWarning: Opens them all one after another. Strict anti-cheat may flag this.",
   "craftysearch.panel.toggle": "Storage panel",
   "craftysearch.panel.toggle.show": "Show storage",
   "craftysearch.panel.toggle.hide": "Hide storage",
@@ -78,6 +80,7 @@
   "craftysearch.storage.need_free_slot": "Needs one free inventory slot",
   "craftysearch.storage.no_room": "No container in range had room for all of it",
   "craftysearch.storage.no_room_in_reach": "No container within reach has room for it",
+  "craftysearch.storage.none_to_check": "No containers within reach",
   "craftysearch.storage.out_of_reach": "%s is out of reach: highlighting where it is",
 
   "craftysearch.background.sneaking": "Stop sneaking to use storage",
@@ -93,6 +96,9 @@
   "craftysearch.background.queue_full": "Too many requests queued; wait for some to finish",
   "craftysearch.background.scanning": "Reading stacked carts: %s of %s",
   "craftysearch.background.rechecking": "Rechecking containers: %s of %s",
+  "craftysearch.background.checking_all": "Checking containers: %s of %s",
+  "craftysearch.background.checked_all": "Checked %s containers",
+  "craftysearch.background.checked_all_skipped": "Checked %s containers, %s didn't open",
 
   "craftysearch.screen.title": "Storage",
   "craftysearch.screen.settings": "Settings...",
